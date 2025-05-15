@@ -1,4 +1,7 @@
 fun @main(): i32 {
 %entry:
-  ret 291
+  %0 = ne 5, 0
+  %1 = ne 8, 0
+  %2 = and %0, %1
+  ret %2
 }

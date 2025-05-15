@@ -18,7 +18,7 @@ fn main() -> Result<()> {
     }
     let input = read_to_string(args[2].clone())?;
     let ast = sysy::CompUnitParser::new().parse(&input).unwrap();
-    // println!("{:#?}", ast);
+    println!("{:#?}", ast);
     let program = ast.gen_ir();
     if args[1] == "-koopa" {
         let mut gen = KoopaGenerator::new(Vec::new());

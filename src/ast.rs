@@ -1,13 +1,13 @@
 #[derive(Debug)]
 pub struct CompUnit {
-  pub func_def: FuncDef,
+    pub func_def: FuncDef,
 }
 
 #[derive(Debug)]
 pub struct FuncDef {
-  pub func_type: FuncType,
-  pub id: String,
-  pub block: Block,
+    pub func_type: FuncType,
+    pub id: String,
+    pub block: Block,
 }
 
 #[derive(Debug)]
@@ -17,10 +17,72 @@ pub enum FuncType {
 
 #[derive(Debug)]
 pub struct Block {
-  pub stmt: Stmt,
+    pub stmt: Stmt,
 }
 
 #[derive(Debug)]
 pub struct Stmt {
-  pub num: i32,
+    pub exp: Exp,
+}
+
+#[derive(Debug)]
+pub struct Exp {
+    pub lorexp: Box<LOrExp>,
+}
+
+#[derive(Debug)]
+pub enum PrimaryExp {
+    Exp(Box<Exp>),
+    Number(i32),
+}
+
+#[derive(Debug)]
+pub enum UnaryExp {
+    PrimaryExp(Box<PrimaryExp>),
+    Pos(Box<UnaryExp>),
+    Neg(Box<UnaryExp>),
+    Not(Box<UnaryExp>),
+}
+
+#[derive(Debug)]
+pub enum MulExp {
+    UnaryExp(Box<UnaryExp>),
+    Mul(Box<MulExp>, Box<UnaryExp>),
+    Div(Box<MulExp>, Box<UnaryExp>),
+    Mod(Box<MulExp>, Box<UnaryExp>),
+}
+
+#[derive(Debug)]
+pub enum AddExp {
+    MulExp(Box<MulExp>),
+    Add(Box<AddExp>, Box<MulExp>),
+    Sub(Box<AddExp>, Box<MulExp>),
+}
+
+#[derive(Debug)]
+pub enum RelExp {
+    AddExp(Box<AddExp>),
+    Lt(Box<RelExp>, Box<AddExp>),
+    Le(Box<RelExp>, Box<AddExp>),
+    Gt(Box<RelExp>, Box<AddExp>),
+    Ge(Box<RelExp>, Box<AddExp>),
+}
+
+#[derive(Debug)]
+pub enum EqExp {
+    RelExp(Box<RelExp>),
+    Eq(Box<EqExp>, Box<RelExp>),
+    Ne(Box<EqExp>, Box<RelExp>),
+}
+
+#[derive(Debug)]
+pub enum LAndExp {
+    EqExp(Box<EqExp>),
+    And(Box<LAndExp>, Box<EqExp>),
+}
+
+#[derive(Debug)]
+pub enum LOrExp {
+    LAndExp(Box<LAndExp>),
+    Or(Box<LOrExp>, Box<LAndExp>),
 }

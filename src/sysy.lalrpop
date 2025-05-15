@@ -28,7 +28,58 @@ FuncType: FuncType = "int" => FuncType::Int;
 
 Block: Block = "{" <stmt: Stmt> "}" => Block { <> };
 
-Stmt: Stmt = "return" <num: Number> ";" => Stmt { <> };
+Stmt: Stmt = "return" <exp: Exp> ";" => Stmt { <> };
+
+Exp: Exp = <lorexp: LOrExp> => Exp { lorexp: Box::new(lorexp) };
+
+PrimaryExp: PrimaryExp = {
+    "(" <exp: Exp> ")" => PrimaryExp::Exp(Box::new(exp)),
+    <num: Number> => PrimaryExp::Number(num),
+}
+
+UnaryExp: UnaryExp = {
+    <primexp: PrimaryExp> => UnaryExp::PrimaryExp(Box::new(primexp)),
+    "+" <unexp: UnaryExp> => UnaryExp::Pos(Box::new(unexp)),
+    "-" <unexp: UnaryExp> => UnaryExp::Neg(Box::new(unexp)),
+    "!" <unexp: UnaryExp> => UnaryExp::Not(Box::new(unexp)),
+}
+
+MulExp: MulExp = {
+    <unexp: UnaryExp> => MulExp::UnaryExp(Box::new(unexp)),
+    <mulexp: MulExp> "*" <unexp: UnaryExp> => MulExp::Mul(Box::new(mulexp), Box::new(unexp)),
+    <mulexp: MulExp> "/" <unexp: UnaryExp> => MulExp::Div(Box::new(mulexp), Box::new(unexp)),
+    <mulexp: MulExp> "%" <unexp: UnaryExp> => MulExp::Mod(Box::new(mulexp), Box::new(unexp)),
+}
+
+AddExp: AddExp = {
+    <mulexp: MulExp> => AddExp::MulExp(Box::new(mulexp)),
+    <addexp: AddExp> "+" <mulexp: MulExp> => AddExp::Add(Box::new(addexp), Box::new(mulexp)),
+    <addexp: AddExp> "-" <mulexp: MulExp> => AddExp::Sub(Box::new(addexp), Box::new(mulexp)),
+}
+
+RelExp: RelExp = {
+    <addexp: AddExp> => RelExp::AddExp(Box::new(addexp)),
+    <relexp: RelExp> "<" <addexp: AddExp> => RelExp::Lt(Box::new(relexp), Box::new(addexp)),
+    <relexp: RelExp> "<=" <addexp: AddExp> => RelExp::Le(Box::new(relexp), Box::new(addexp)),
+    <relexp: RelExp> ">" <addexp: AddExp> => RelExp::Gt(Box::new(relexp), Box::new(addexp)),
+    <relexp: RelExp> ">=" <addexp: AddExp> => RelExp::Ge(Box::new(relexp), Box::new(addexp)),
+}
+
+EqExp: EqExp = {
+    <relexp: RelExp> => EqExp::RelExp(Box::new(relexp)),
+    <eqexp: EqExp> "==" <relexp: RelExp> => EqExp::Eq(Box::new(eqexp), Box::new(relexp)),
+    <eqexp: EqExp> "!=" <relexp: RelExp> => EqExp::Ne(Box::new(eqexp), Box::new(relexp)),
+}
+
+LAndExp: LAndExp = {
+    <eqexp: EqExp> => LAndExp::EqExp(Box::new(eqexp)),
+    <landexp: LAndExp> "&&" <eqexp: EqExp> => LAndExp::And(Box::new(landexp), Box::new(eqexp)),
+}
+
+LOrExp: LOrExp = {
+    <landexp: LAndExp> => LOrExp::LAndExp(Box::new(landexp)),
+    <lorexp: LOrExp> "||" <landexp: LAndExp> => LOrExp::Or(Box::new(lorexp), Box::new(landexp)),
+}
 
 Number: i32 = <num: IntConst> => <>;
 
