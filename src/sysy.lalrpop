@@ -24,16 +24,57 @@ FuncDef: FuncDef = {
   }
 }
 
+Decl: Decl = {
+    "int" <firdef: VarDef> <restdef: ("," VarDef)*> ";" => {
+        let mut decl = Vec::new();
+        decl.push(Box::new(firdef));
+        for (_, item) in restdef.into_iter() {
+            decl.push(Box::new(item));
+        }
+        return Decl {defs: decl};
+    },
+    "const" "int" <firdef: VarDef> <restdef: ("," VarDef)*> ";" => {
+        let mut decl = Vec::new();
+        decl.push(Box::new(firdef));
+        for (_, item) in restdef.into_iter() {
+            decl.push(Box::new(item));
+        }
+        return Decl {defs: decl};
+    }
+}
+
+VarDef: VarDef = {
+    <id: Ident> => VarDef::Ident(id),
+    <id: Ident> "=" <exp: Exp> => VarDef::IdentInit(id, Box::new(exp)),
+}
+
 FuncType: FuncType = "int" => FuncType::Int;
 
-Block: Block = "{" <stmt: Stmt> "}" => Block { <> };
+Block: Block = "{" <blockitem: BlockItem*> "}" => {
+    let mut block = Vec::new();
+    for item in blockitem.into_iter() {
+        block.push(Box::new(item));
+    }
+    return Block { vecitem: block };
+};
 
-Stmt: Stmt = "return" <exp: Exp> ";" => Stmt { <> };
+BlockItem: BlockItem = {
+    <stmt: Stmt> => BlockItem::Stmt(Box::new(stmt)),
+    <decl: Decl> => BlockItem::Decl(Box::new(decl)),
+}
+
+Stmt: Stmt = {
+    <lval: LVal> "=" <exp: Exp> ";" => Stmt::Assign(lval, Box::new(exp)),
+    "return" <exp: Exp> ";" => Stmt::Return(Box::new(exp)),
+}
 
 Exp: Exp = <lorexp: LOrExp> => Exp { lorexp: Box::new(lorexp) };
 
+LVal: String = <id: Ident> => <>;
+
 PrimaryExp: PrimaryExp = {
     "(" <exp: Exp> ")" => PrimaryExp::Exp(Box::new(exp)),
+    <lval: LVal> => PrimaryExp::LVal(lval),
     <num: Number> => PrimaryExp::Number(num),
 }
 

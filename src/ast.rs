@@ -17,12 +17,20 @@ pub enum FuncType {
 
 #[derive(Debug)]
 pub struct Block {
-    pub stmt: Stmt,
+    // pub stmt: Stmt,
+    pub vecitem: Vec<Box<BlockItem>>,
 }
 
 #[derive(Debug)]
-pub struct Stmt {
-    pub exp: Exp,
+pub enum BlockItem {
+    Stmt(Box<Stmt>),
+    Decl(Box<Decl>),
+}
+
+#[derive(Debug)]
+pub enum Stmt {
+    Assign(String, Box<Exp>),
+    Return(Box<Exp>),
 }
 
 #[derive(Debug)]
@@ -33,7 +41,19 @@ pub struct Exp {
 #[derive(Debug)]
 pub enum PrimaryExp {
     Exp(Box<Exp>),
+    LVal(String),
     Number(i32),
+}
+
+#[derive(Debug)]
+pub struct Decl {
+    pub defs: Vec<Box<VarDef>>,
+}
+
+#[derive(Debug)]
+pub enum VarDef {
+    Ident(String),
+    IdentInit(String, Box<Exp>),
 }
 
 #[derive(Debug)]

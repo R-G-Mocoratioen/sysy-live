@@ -1,6 +1,7 @@
 use crate::ast::*;
 use koopa::ir::builder_traits::*;
 use koopa::ir::*;
+use std::collections::HashMap;
 
 impl CompUnit {
     pub fn gen_ir(&self) -> Program {
@@ -21,62 +22,136 @@ impl FuncDef {
         ));
 
         let main_data = program.func_mut(main);
+        let mut var: HashMap<String, Value> = HashMap::new();
 
-        self.block.gen_ir(main_data);
+        self.block.gen_ir(main_data, &mut var);
+    }
+}
+
+impl VarDef {
+    fn gen_ir(&self, data: &mut FunctionData, entry: BasicBlock, var: &mut HashMap<String, Value>) {
+        let alloc = data.dfg_mut().new_value().alloc(Type::get_i32());
+        data.layout_mut().bb_mut(entry).insts_mut().extend([alloc]);
+        match self {
+            VarDef::Ident(id) => {
+                var.insert(id.clone(), alloc);
+            }
+            VarDef::IdentInit(id, exp) => {
+                var.insert(id.clone(), alloc);
+                let val = exp.gen_ir(data, entry, var);
+                let store = data.dfg_mut().new_value().store(val, alloc);
+                data.layout_mut().bb_mut(entry).insts_mut().extend([store]);
+            }
+        }
+    }
+}
+
+impl Decl {
+    fn gen_ir(&self, data: &mut FunctionData, entry: BasicBlock, var: &mut HashMap<String, Value>) {
+        for item in self.defs.iter() {
+            item.gen_ir(data, entry, var);
+        }
     }
 }
 
 impl Block {
-    fn gen_ir(&self, data: &mut FunctionData) {
-        let entry = data.dfg_mut().new_bb().basic_block(Some("%entry".into()));
+    fn gen_ir(&self, data: &mut FunctionData, var: &mut HashMap<String, Value>) {
+        let entry = data.dfg_mut().new_bb().basic_block(None);
         let _ = data.layout_mut().bbs_mut().push_key_back(entry);
 
-        self.stmt.gen_ir(data, entry);
+        let mut myvar: HashMap<String, Value> = var.clone();
+        for item in &self.vecitem {
+            item.gen_ir(data, entry, &mut myvar);
+        }
+    }
+}
+
+impl BlockItem {
+    fn gen_ir(&self, data: &mut FunctionData, entry: BasicBlock, var: &mut HashMap<String, Value>) {
+        match self {
+            BlockItem::Stmt(stmt) => stmt.gen_ir(data, entry, var),
+            BlockItem::Decl(decl) => decl.gen_ir(data, entry, var),
+        }
     }
 }
 
 impl Stmt {
-    fn gen_ir(&self, data: &mut FunctionData, entry: BasicBlock) {
-        // let val = data.dfg_mut().new_value().integer(self.num);
-        let val = self.exp.gen_ir(data, entry);
-        let ret = data.dfg_mut().new_value().ret(Some(val));
-        data.layout_mut().bb_mut(entry).insts_mut().extend([ret]);
+    fn gen_ir(&self, data: &mut FunctionData, entry: BasicBlock, var: &mut HashMap<String, Value>) {
+        match self {
+            Stmt::Assign(id, exp) => {
+                let opt = var.get(id).cloned();
+                if let Some(val) = opt {
+                    let valexp = exp.gen_ir(data, entry, var);
+                    let store = data.dfg_mut().new_value().store(valexp, val);
+                    data.layout_mut().bb_mut(entry).insts_mut().extend([store]);
+                }
+            }
+            Stmt::Return(exp) => {
+                let val = exp.gen_ir(data, entry, var);
+                let ret = data.dfg_mut().new_value().ret(Some(val));
+                data.layout_mut().bb_mut(entry).insts_mut().extend([ret]);
+            }
+        }
     }
 }
 
 impl Exp {
-    fn gen_ir(&self, data: &mut FunctionData, entry: BasicBlock) -> Value {
-        self.lorexp.gen_ir(data, entry)
+    fn gen_ir(
+        &self,
+        data: &mut FunctionData,
+        entry: BasicBlock,
+        var: &mut HashMap<String, Value>,
+    ) -> Value {
+        self.lorexp.gen_ir(data, entry, var)
     }
 }
 
 impl PrimaryExp {
-    fn gen_ir(&self, data: &mut FunctionData, entry: BasicBlock) -> Value {
+    fn gen_ir(
+        &self,
+        data: &mut FunctionData,
+        entry: BasicBlock,
+        var: &mut HashMap<String, Value>,
+    ) -> Value {
         match self {
-            PrimaryExp::Exp(exp) => exp.gen_ir(data, entry),
+            PrimaryExp::Exp(exp) => exp.gen_ir(data, entry, var),
             PrimaryExp::Number(num) => {
                 let val = data.dfg_mut().new_value().integer(*num);
                 val
+            }
+            PrimaryExp::LVal(id) => {
+                if let Some(val) = var.get(id) {
+                    let load = data.dfg_mut().new_value().load(*val);
+                    data.layout_mut().bb_mut(entry).insts_mut().extend([load]);
+                    load
+                } else {
+                    panic!("Variable {} not found", id);
+                }
             }
         }
     }
 }
 
 impl UnaryExp {
-    fn gen_ir(&self, data: &mut FunctionData, entry: BasicBlock) -> Value {
+    fn gen_ir(
+        &self,
+        data: &mut FunctionData,
+        entry: BasicBlock,
+        var: &mut HashMap<String, Value>,
+    ) -> Value {
         match self {
-            UnaryExp::PrimaryExp(primary_exp) => primary_exp.gen_ir(data, entry),
-            UnaryExp::Pos(unary_exp) => unary_exp.gen_ir(data, entry),
+            UnaryExp::PrimaryExp(primary_exp) => primary_exp.gen_ir(data, entry, var),
+            UnaryExp::Pos(unary_exp) => unary_exp.gen_ir(data, entry, var),
             UnaryExp::Neg(unary_exp) => {
                 let zero = data.dfg_mut().new_value().integer(0);
-                let val = unary_exp.gen_ir(data, entry);
+                let val = unary_exp.gen_ir(data, entry, var);
                 let res = data.dfg_mut().new_value().binary(BinaryOp::Sub, zero, val);
                 data.layout_mut().bb_mut(entry).insts_mut().extend([res]);
                 res
             }
             UnaryExp::Not(unary_exp) => {
                 let zero = data.dfg_mut().new_value().integer(0);
-                let val = unary_exp.gen_ir(data, entry);
+                let val = unary_exp.gen_ir(data, entry, var);
                 let res = data.dfg_mut().new_value().binary(BinaryOp::Eq, zero, val);
                 data.layout_mut().bb_mut(entry).insts_mut().extend([res]);
                 res
@@ -86,12 +161,17 @@ impl UnaryExp {
 }
 
 impl MulExp {
-    fn gen_ir(&self, data: &mut FunctionData, entry: BasicBlock) -> Value {
+    fn gen_ir(
+        &self,
+        data: &mut FunctionData,
+        entry: BasicBlock,
+        var: &mut HashMap<String, Value>,
+    ) -> Value {
         match self {
-            MulExp::UnaryExp(unary_exp) => unary_exp.gen_ir(data, entry),
+            MulExp::UnaryExp(unary_exp) => unary_exp.gen_ir(data, entry, var),
             MulExp::Mul(mul_exp, unary_exp) => {
-                let left = mul_exp.gen_ir(data, entry);
-                let right = unary_exp.gen_ir(data, entry);
+                let left = mul_exp.gen_ir(data, entry, var);
+                let right = unary_exp.gen_ir(data, entry, var);
                 let res = data
                     .dfg_mut()
                     .new_value()
@@ -100,8 +180,8 @@ impl MulExp {
                 res
             }
             MulExp::Div(mul_exp, unary_exp) => {
-                let left = mul_exp.gen_ir(data, entry);
-                let right = unary_exp.gen_ir(data, entry);
+                let left = mul_exp.gen_ir(data, entry, var);
+                let right = unary_exp.gen_ir(data, entry, var);
                 let res = data
                     .dfg_mut()
                     .new_value()
@@ -110,8 +190,8 @@ impl MulExp {
                 res
             }
             MulExp::Mod(mul_exp, unary_exp) => {
-                let left = mul_exp.gen_ir(data, entry);
-                let right = unary_exp.gen_ir(data, entry);
+                let left = mul_exp.gen_ir(data, entry, var);
+                let right = unary_exp.gen_ir(data, entry, var);
                 let res = data
                     .dfg_mut()
                     .new_value()
@@ -124,12 +204,17 @@ impl MulExp {
 }
 
 impl AddExp {
-    fn gen_ir(&self, data: &mut FunctionData, entry: BasicBlock) -> Value {
+    fn gen_ir(
+        &self,
+        data: &mut FunctionData,
+        entry: BasicBlock,
+        var: &mut HashMap<String, Value>,
+    ) -> Value {
         match self {
-            AddExp::MulExp(mul_exp) => mul_exp.gen_ir(data, entry),
+            AddExp::MulExp(mul_exp) => mul_exp.gen_ir(data, entry, var),
             AddExp::Add(add_exp, mul_exp) => {
-                let left = add_exp.gen_ir(data, entry);
-                let right = mul_exp.gen_ir(data, entry);
+                let left = add_exp.gen_ir(data, entry, var);
+                let right = mul_exp.gen_ir(data, entry, var);
                 let res = data
                     .dfg_mut()
                     .new_value()
@@ -138,8 +223,8 @@ impl AddExp {
                 res
             }
             AddExp::Sub(add_exp, mul_exp) => {
-                let left = add_exp.gen_ir(data, entry);
-                let right = mul_exp.gen_ir(data, entry);
+                let left = add_exp.gen_ir(data, entry, var);
+                let right = mul_exp.gen_ir(data, entry, var);
                 let res = data
                     .dfg_mut()
                     .new_value()
@@ -152,33 +237,38 @@ impl AddExp {
 }
 
 impl RelExp {
-    fn gen_ir(&self, data: &mut FunctionData, entry: BasicBlock) -> Value {
+    fn gen_ir(
+        &self,
+        data: &mut FunctionData,
+        entry: BasicBlock,
+        var: &mut HashMap<String, Value>,
+    ) -> Value {
         match self {
-            RelExp::AddExp(add_exp) => add_exp.gen_ir(data, entry),
+            RelExp::AddExp(add_exp) => add_exp.gen_ir(data, entry, var),
             RelExp::Lt(rel_exp, add_exp) => {
-                let left = rel_exp.gen_ir(data, entry);
-                let right = add_exp.gen_ir(data, entry);
+                let left = rel_exp.gen_ir(data, entry, var);
+                let right = add_exp.gen_ir(data, entry, var);
                 let res = data.dfg_mut().new_value().binary(BinaryOp::Lt, left, right);
                 data.layout_mut().bb_mut(entry).insts_mut().extend([res]);
                 res
             }
             RelExp::Le(rel_exp, add_exp) => {
-                let left = rel_exp.gen_ir(data, entry);
-                let right = add_exp.gen_ir(data, entry);
+                let left = rel_exp.gen_ir(data, entry, var);
+                let right = add_exp.gen_ir(data, entry, var);
                 let res = data.dfg_mut().new_value().binary(BinaryOp::Le, left, right);
                 data.layout_mut().bb_mut(entry).insts_mut().extend([res]);
                 res
             }
             RelExp::Gt(rel_exp, add_exp) => {
-                let left = rel_exp.gen_ir(data, entry);
-                let right = add_exp.gen_ir(data, entry);
+                let left = rel_exp.gen_ir(data, entry, var);
+                let right = add_exp.gen_ir(data, entry, var);
                 let res = data.dfg_mut().new_value().binary(BinaryOp::Gt, left, right);
                 data.layout_mut().bb_mut(entry).insts_mut().extend([res]);
                 res
             }
             RelExp::Ge(rel_exp, add_exp) => {
-                let left = rel_exp.gen_ir(data, entry);
-                let right = add_exp.gen_ir(data, entry);
+                let left = rel_exp.gen_ir(data, entry, var);
+                let right = add_exp.gen_ir(data, entry, var);
                 let res = data.dfg_mut().new_value().binary(BinaryOp::Ge, left, right);
                 data.layout_mut().bb_mut(entry).insts_mut().extend([res]);
                 res
@@ -188,19 +278,24 @@ impl RelExp {
 }
 
 impl EqExp {
-    fn gen_ir(&self, data: &mut FunctionData, entry: BasicBlock) -> Value {
+    fn gen_ir(
+        &self,
+        data: &mut FunctionData,
+        entry: BasicBlock,
+        var: &mut HashMap<String, Value>,
+    ) -> Value {
         match self {
-            EqExp::RelExp(rel_exp) => rel_exp.gen_ir(data, entry),
+            EqExp::RelExp(rel_exp) => rel_exp.gen_ir(data, entry, var),
             EqExp::Eq(eq_exp, rel_exp) => {
-                let left = eq_exp.gen_ir(data, entry);
-                let right = rel_exp.gen_ir(data, entry);
+                let left = eq_exp.gen_ir(data, entry, var);
+                let right = rel_exp.gen_ir(data, entry, var);
                 let res = data.dfg_mut().new_value().binary(BinaryOp::Eq, left, right);
                 data.layout_mut().bb_mut(entry).insts_mut().extend([res]);
                 res
             }
             EqExp::Ne(eq_exp, rel_exp) => {
-                let left = eq_exp.gen_ir(data, entry);
-                let right = rel_exp.gen_ir(data, entry);
+                let left = eq_exp.gen_ir(data, entry, var);
+                let right = rel_exp.gen_ir(data, entry, var);
                 let res = data
                     .dfg_mut()
                     .new_value()
@@ -213,12 +308,17 @@ impl EqExp {
 }
 
 impl LAndExp {
-    fn gen_ir(&self, data: &mut FunctionData, entry: BasicBlock) -> Value {
+    fn gen_ir(
+        &self,
+        data: &mut FunctionData,
+        entry: BasicBlock,
+        var: &mut HashMap<String, Value>,
+    ) -> Value {
         match self {
-            LAndExp::EqExp(eq_exp) => eq_exp.gen_ir(data, entry),
+            LAndExp::EqExp(eq_exp) => eq_exp.gen_ir(data, entry, var),
             LAndExp::And(l_and_exp, eq_exp) => {
-                let left = l_and_exp.gen_ir(data, entry);
-                let right = eq_exp.gen_ir(data, entry);
+                let left = l_and_exp.gen_ir(data, entry, var);
+                let right = eq_exp.gen_ir(data, entry, var);
                 let zero = data.dfg_mut().new_value().integer(0);
                 let t1 = data
                     .dfg_mut()
@@ -240,12 +340,17 @@ impl LAndExp {
 }
 
 impl LOrExp {
-    fn gen_ir(&self, data: &mut FunctionData, entry: BasicBlock) -> Value {
+    fn gen_ir(
+        &self,
+        data: &mut FunctionData,
+        entry: BasicBlock,
+        var: &mut HashMap<String, Value>,
+    ) -> Value {
         match self {
-            LOrExp::LAndExp(l_and_exp) => l_and_exp.gen_ir(data, entry),
+            LOrExp::LAndExp(l_and_exp) => l_and_exp.gen_ir(data, entry, var),
             LOrExp::Or(l_or_exp, l_and_exp) => {
-                let left = l_or_exp.gen_ir(data, entry);
-                let right = l_and_exp.gen_ir(data, entry);
+                let left = l_or_exp.gen_ir(data, entry, var);
+                let right = l_and_exp.gen_ir(data, entry, var);
                 let zero = data.dfg_mut().new_value().integer(0);
                 let t1 = data.dfg_mut().new_value().binary(BinaryOp::Or, left, right);
                 let t2 = data.dfg_mut().new_value().binary(BinaryOp::NotEq, zero, t1);
