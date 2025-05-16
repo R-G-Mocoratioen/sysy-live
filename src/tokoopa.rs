@@ -133,6 +133,43 @@ impl Stmt {
             Stmt::Block(block) => {
                 block.gen_ir(data, entry, var);
             }
+            Stmt::If(exp, stmt) => {
+                let val = exp.gen_ir(data, *entry, var);
+                let mut bb1 = data.dfg_mut().new_bb().basic_block(None);
+                let bb3 = data.dfg_mut().new_bb().basic_block(None);
+                let _ = data.layout_mut().bbs_mut().push_key_back(bb1);
+                let _ = data.layout_mut().bbs_mut().push_key_back(bb3);
+                let br1 = data.dfg_mut().new_value().branch(val, bb1, bb3);
+                data.layout_mut().bb_mut(*entry).insts_mut().extend([br1]);
+                // if 里面
+                let mut myvar: HashMap<String, Value> = var.clone();
+                stmt.gen_ir(data, &mut bb1, &mut myvar);
+                let jto3 = data.dfg_mut().new_value().jump(bb3);
+                data.layout_mut().bb_mut(bb1).insts_mut().extend([jto3]);
+                // if 结束
+                *entry = bb3;
+            }
+            Stmt::IfElse(exp, ifstmt, elsestmt) => {
+                let val = exp.gen_ir(data, *entry, var);
+                let mut bb1 = data.dfg_mut().new_bb().basic_block(None);
+                let mut bb2 = data.dfg_mut().new_bb().basic_block(None);
+                let bb3 = data.dfg_mut().new_bb().basic_block(None);
+                let _ = data.layout_mut().bbs_mut().push_key_back(bb1);
+                let _ = data.layout_mut().bbs_mut().push_key_back(bb2);
+                let _ = data.layout_mut().bbs_mut().push_key_back(bb3);
+                let br1 = data.dfg_mut().new_value().branch(val, bb1, bb2);
+                data.layout_mut().bb_mut(*entry).insts_mut().extend([br1]);
+                // if, else 里面
+                let mut myvar1: HashMap<String, Value> = var.clone();
+                let mut myvar2: HashMap<String, Value> = var.clone();
+                ifstmt.gen_ir(data, &mut bb1, &mut myvar1);
+                elsestmt.gen_ir(data, &mut bb2, &mut myvar2);
+                let jto3 = data.dfg_mut().new_value().jump(bb3);
+                data.layout_mut().bb_mut(bb1).insts_mut().extend([jto3]);
+                data.layout_mut().bb_mut(bb2).insts_mut().extend([jto3]);
+                // if 结束
+                *entry = bb3;
+            }
         }
     }
 }

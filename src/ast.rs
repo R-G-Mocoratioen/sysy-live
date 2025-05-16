@@ -33,6 +33,8 @@ pub enum Stmt {
     Return(Box<Option<Exp>>),
     Do(Box<Option<Exp>>),
     Block(Box<Block>),
+    If(Box<Exp>, Box<Stmt>),
+    IfElse(Box<Exp>, Box<Stmt>, Box<Stmt>),
 }
 
 #[derive(Debug)]
