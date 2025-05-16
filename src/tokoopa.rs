@@ -111,12 +111,27 @@ impl Stmt {
                     data.layout_mut().bb_mut(*entry).insts_mut().extend([store]);
                 }
             }
-            Stmt::Return(exp) => {
-                let val = exp.gen_ir(data, *entry, var);
-                let ret = data.dfg_mut().new_value().ret(Some(val));
-                data.layout_mut().bb_mut(*entry).insts_mut().extend([ret]);
+            Stmt::Return(optexp) => {
+                if let Some(exp) = (*optexp).as_ref() {
+                    let val = exp.gen_ir(data, *entry, var);
+                    let ret = data.dfg_mut().new_value().ret(Some(val));
+                    data.layout_mut().bb_mut(*entry).insts_mut().extend([ret]);
+                } else {
+                    let ret = data.dfg_mut().new_value().ret(None);
+                    data.layout_mut().bb_mut(*entry).insts_mut().extend([ret]);
+                }
+                // ret means a new basic block
                 *entry = data.dfg_mut().new_bb().basic_block(None);
                 let _ = data.layout_mut().bbs_mut().push_key_back(*entry);
+            }
+            Stmt::Do(optexp) => {
+                if let Some(exp) = (*optexp).as_ref() {
+                    let _ = exp.gen_ir(data, *entry, var);
+                } else {
+                }
+            }
+            Stmt::Block(block) => {
+                block.gen_ir(data, entry, var);
             }
         }
     }

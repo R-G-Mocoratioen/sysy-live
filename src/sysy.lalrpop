@@ -63,9 +63,13 @@ BlockItem: BlockItem = {
     <decl: Decl> => BlockItem::Decl(Box::new(decl)),
 }
 
+OptionExp: Option<Exp> = Exp?;
+
 Stmt: Stmt = {
     <lval: LVal> "=" <exp: Exp> ";" => Stmt::Assign(lval, Box::new(exp)),
-    "return" <exp: Exp> ";" => Stmt::Return(Box::new(exp)),
+    <optexp: OptionExp> ";" => Stmt::Do(Box::new(optexp)),
+    "return" <optexp: OptionExp> ";" => Stmt::Return(Box::new(optexp)),
+    <block: Block> => Stmt::Block(Box::new(block)),
 }
 
 Exp: Exp = <lorexp: LOrExp> => Exp { lorexp: Box::new(lorexp) };

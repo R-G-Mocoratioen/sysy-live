@@ -1,11 +1,4 @@
-Decl          ::= ("int" | "const int") VarDef {"," VarDef} ";";
-VarDef        ::= IDENT | IDENT "=" InitVal;
-InitVal       ::= Exp;
-
-FuncDef       ::= FuncType IDENT "(" ")" Block;
-FuncType      ::= "int";
-
-Block         ::= "{" {BlockItem} "}";
-BlockItem     ::= Decl | Stmt;
-Stmt          ::= LVal "=" Exp ";"
-                | "return" Exp ";";
+ Stmt ::= LVal "=" Exp ";" 
+       | [Exp] ";" 
+       | Block 
+       | "return" [Exp] ";";

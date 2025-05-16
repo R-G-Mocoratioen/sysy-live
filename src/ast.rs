@@ -30,7 +30,9 @@ pub enum BlockItem {
 #[derive(Debug)]
 pub enum Stmt {
     Assign(String, Box<Exp>),
-    Return(Box<Exp>),
+    Return(Box<Option<Exp>>),
+    Do(Box<Option<Exp>>),
+    Block(Box<Block>),
 }
 
 #[derive(Debug)]
