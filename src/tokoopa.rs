@@ -24,7 +24,20 @@ impl FuncDef {
         let main_data = program.func_mut(main);
         let mut var: HashMap<String, Value> = HashMap::new();
 
-        self.block.gen_ir(main_data, &mut var);
+        let mut entry = main_data.dfg_mut().new_bb().basic_block(None);
+        let _ = main_data.layout_mut().bbs_mut().push_key_back(entry);
+
+        self.block.gen_ir(main_data, &mut entry, &mut var);
+
+        // add an unreachable "return 0" at the end
+
+        let zero = main_data.dfg_mut().new_value().integer(0);
+        let ret = main_data.dfg_mut().new_value().ret(Some(zero));
+        main_data
+            .layout_mut()
+            .bb_mut(entry)
+            .insts_mut()
+            .extend([ret]);
     }
 }
 
@@ -55,10 +68,12 @@ impl Decl {
 }
 
 impl Block {
-    fn gen_ir(&self, data: &mut FunctionData, var: &mut HashMap<String, Value>) {
-        let entry = data.dfg_mut().new_bb().basic_block(None);
-        let _ = data.layout_mut().bbs_mut().push_key_back(entry);
-
+    fn gen_ir(
+        &self,
+        data: &mut FunctionData,
+        entry: &mut BasicBlock,
+        var: &mut HashMap<String, Value>,
+    ) {
         let mut myvar: HashMap<String, Value> = var.clone();
         for item in &self.vecitem {
             item.gen_ir(data, entry, &mut myvar);
@@ -67,29 +82,41 @@ impl Block {
 }
 
 impl BlockItem {
-    fn gen_ir(&self, data: &mut FunctionData, entry: BasicBlock, var: &mut HashMap<String, Value>) {
+    fn gen_ir(
+        &self,
+        data: &mut FunctionData,
+        entry: &mut BasicBlock,
+        var: &mut HashMap<String, Value>,
+    ) {
         match self {
             BlockItem::Stmt(stmt) => stmt.gen_ir(data, entry, var),
-            BlockItem::Decl(decl) => decl.gen_ir(data, entry, var),
+            BlockItem::Decl(decl) => decl.gen_ir(data, *entry, var),
         }
     }
 }
 
 impl Stmt {
-    fn gen_ir(&self, data: &mut FunctionData, entry: BasicBlock, var: &mut HashMap<String, Value>) {
+    fn gen_ir(
+        &self,
+        data: &mut FunctionData,
+        entry: &mut BasicBlock,
+        var: &mut HashMap<String, Value>,
+    ) {
         match self {
             Stmt::Assign(id, exp) => {
                 let opt = var.get(id).cloned();
                 if let Some(val) = opt {
-                    let valexp = exp.gen_ir(data, entry, var);
+                    let valexp = exp.gen_ir(data, *entry, var);
                     let store = data.dfg_mut().new_value().store(valexp, val);
-                    data.layout_mut().bb_mut(entry).insts_mut().extend([store]);
+                    data.layout_mut().bb_mut(*entry).insts_mut().extend([store]);
                 }
             }
             Stmt::Return(exp) => {
-                let val = exp.gen_ir(data, entry, var);
+                let val = exp.gen_ir(data, *entry, var);
                 let ret = data.dfg_mut().new_value().ret(Some(val));
-                data.layout_mut().bb_mut(entry).insts_mut().extend([ret]);
+                data.layout_mut().bb_mut(*entry).insts_mut().extend([ret]);
+                *entry = data.dfg_mut().new_bb().basic_block(None);
+                let _ = data.layout_mut().bbs_mut().push_key_back(*entry);
             }
         }
     }
