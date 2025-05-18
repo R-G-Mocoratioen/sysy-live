@@ -61,6 +61,7 @@ pub struct Decl {
 pub enum VarDef {
     Ident(String),
     IdentInit(String, Box<Exp>),
+    ConstIdentInit(String, Box<Exp>),
 }
 
 #[derive(Debug)]

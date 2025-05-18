@@ -1,16 +1,10 @@
 int main() {
-  int a = 1, b = 2;
-  while (a < 10) {
-    a = a + 1;
-    while (a < 5 && b < 10) {
-      b = b + 1;
-    }
-    while (b < 20) {
-      while (b < 6 || b == 6) {
-        b = b + 1;
-      }
-      b = b + 2;
-    }
-  }
-  return a + b;
+  int x;
+  const int k = 10 + 11;
+  int y = k;
+  x = y + 1;
+  const int n = k * 7;
+  int z = n - x, w = n - y;
+  w = w * 1 * 1 * 1;
+  return z + w;
 }

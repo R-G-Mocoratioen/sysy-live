@@ -1,4 +1,5 @@
 use crate::ast::*;
+use crate::constint::*;
 use crate::whilecontext::*;
 use koopa::ir::builder_traits::*;
 use koopa::ir::*;
@@ -49,17 +50,24 @@ impl VarDef {
         entry: &mut BasicBlock,
         var: &mut HashMap<String, Value>,
     ) {
-        let alloc = data.dfg_mut().new_value().alloc(Type::get_i32());
-        data.layout_mut().bb_mut(*entry).insts_mut().extend([alloc]);
         match self {
             VarDef::Ident(id) => {
+                let alloc = data.dfg_mut().new_value().alloc(Type::get_i32());
+                data.layout_mut().bb_mut(*entry).insts_mut().extend([alloc]);
                 var.insert(id.clone(), alloc);
             }
             VarDef::IdentInit(id, exp) => {
+                let alloc = data.dfg_mut().new_value().alloc(Type::get_i32());
+                data.layout_mut().bb_mut(*entry).insts_mut().extend([alloc]);
                 var.insert(id.clone(), alloc);
                 let val = exp.gen_ir(data, entry, var);
                 let store = data.dfg_mut().new_value().store(val, alloc);
                 data.layout_mut().bb_mut(*entry).insts_mut().extend([store]);
+            }
+            VarDef::ConstIdentInit(id, exp) => {
+                let val = exp.gen_ir(data, entry, var);
+                assert!(data.dfg_mut().value(val).kind().is_const());
+                var.insert(id.clone(), val); // const 变量直接存值
             }
         }
     }
@@ -277,6 +285,10 @@ impl PrimaryExp {
             }
             PrimaryExp::LVal(id) => {
                 if let Some(val) = var.get(id) {
+                    if data.dfg_mut().value(val.clone()).kind().is_const() {
+                        // 常量
+                        return val.clone();
+                    }
                     let load = data.dfg_mut().new_value().load(*val);
                     data.layout_mut().bb_mut(*entry).insts_mut().extend([load]);
                     load
@@ -299,15 +311,21 @@ impl UnaryExp {
             UnaryExp::PrimaryExp(primary_exp) => primary_exp.gen_ir(data, entry, var),
             UnaryExp::Pos(unary_exp) => unary_exp.gen_ir(data, entry, var),
             UnaryExp::Neg(unary_exp) => {
-                let zero = data.dfg_mut().new_value().integer(0);
                 let val = unary_exp.gen_ir(data, entry, var);
+                if let Some(rv) = get_const_int(data, val) {
+                    return data.dfg_mut().new_value().integer(-rv);
+                }
+                let zero = data.dfg_mut().new_value().integer(0);
                 let res = data.dfg_mut().new_value().binary(BinaryOp::Sub, zero, val);
                 data.layout_mut().bb_mut(*entry).insts_mut().extend([res]);
                 res
             }
             UnaryExp::Not(unary_exp) => {
-                let zero = data.dfg_mut().new_value().integer(0);
                 let val = unary_exp.gen_ir(data, entry, var);
+                if let Some(rv) = get_const_int(data, val) {
+                    return data.dfg_mut().new_value().integer(!rv);
+                }
+                let zero = data.dfg_mut().new_value().integer(0);
                 let res = data.dfg_mut().new_value().binary(BinaryOp::Eq, zero, val);
                 data.layout_mut().bb_mut(*entry).insts_mut().extend([res]);
                 res
@@ -328,6 +346,11 @@ impl MulExp {
             MulExp::Mul(mul_exp, unary_exp) => {
                 let left = mul_exp.gen_ir(data, entry, var);
                 let right = unary_exp.gen_ir(data, entry, var);
+                if let Some(rv) = get_const_int(data, left) {
+                    if let Some(rv1) = get_const_int(data, right) {
+                        return data.dfg_mut().new_value().integer(rv * rv1);
+                    }
+                }
                 let res = data
                     .dfg_mut()
                     .new_value()
@@ -338,6 +361,11 @@ impl MulExp {
             MulExp::Div(mul_exp, unary_exp) => {
                 let left = mul_exp.gen_ir(data, entry, var);
                 let right = unary_exp.gen_ir(data, entry, var);
+                if let Some(rv) = get_const_int(data, left) {
+                    if let Some(rv1) = get_const_int(data, right) {
+                        return data.dfg_mut().new_value().integer(rv / rv1);
+                    }
+                }
                 let res = data
                     .dfg_mut()
                     .new_value()
@@ -348,6 +376,11 @@ impl MulExp {
             MulExp::Mod(mul_exp, unary_exp) => {
                 let left = mul_exp.gen_ir(data, entry, var);
                 let right = unary_exp.gen_ir(data, entry, var);
+                if let Some(rv) = get_const_int(data, left) {
+                    if let Some(rv1) = get_const_int(data, right) {
+                        return data.dfg_mut().new_value().integer(rv % rv1);
+                    }
+                }
                 let res = data
                     .dfg_mut()
                     .new_value()
@@ -371,6 +404,11 @@ impl AddExp {
             AddExp::Add(add_exp, mul_exp) => {
                 let left = add_exp.gen_ir(data, entry, var);
                 let right = mul_exp.gen_ir(data, entry, var);
+                if let Some(rv) = get_const_int(data, left) {
+                    if let Some(rv1) = get_const_int(data, right) {
+                        return data.dfg_mut().new_value().integer(rv + rv1);
+                    }
+                }
                 let res = data
                     .dfg_mut()
                     .new_value()
@@ -381,6 +419,11 @@ impl AddExp {
             AddExp::Sub(add_exp, mul_exp) => {
                 let left = add_exp.gen_ir(data, entry, var);
                 let right = mul_exp.gen_ir(data, entry, var);
+                if let Some(rv) = get_const_int(data, left) {
+                    if let Some(rv1) = get_const_int(data, right) {
+                        return data.dfg_mut().new_value().integer(rv - rv1);
+                    }
+                }
                 let res = data
                     .dfg_mut()
                     .new_value()
@@ -404,6 +447,11 @@ impl RelExp {
             RelExp::Lt(rel_exp, add_exp) => {
                 let left = rel_exp.gen_ir(data, entry, var);
                 let right = add_exp.gen_ir(data, entry, var);
+                if let Some(rv) = get_const_int(data, left) {
+                    if let Some(rv1) = get_const_int(data, right) {
+                        return data.dfg_mut().new_value().integer((rv < rv1) as i32);
+                    }
+                }
                 let res = data.dfg_mut().new_value().binary(BinaryOp::Lt, left, right);
                 data.layout_mut().bb_mut(*entry).insts_mut().extend([res]);
                 res
@@ -411,6 +459,11 @@ impl RelExp {
             RelExp::Le(rel_exp, add_exp) => {
                 let left = rel_exp.gen_ir(data, entry, var);
                 let right = add_exp.gen_ir(data, entry, var);
+                if let Some(rv) = get_const_int(data, left) {
+                    if let Some(rv1) = get_const_int(data, right) {
+                        return data.dfg_mut().new_value().integer((rv <= rv1) as i32);
+                    }
+                }
                 let res = data.dfg_mut().new_value().binary(BinaryOp::Le, left, right);
                 data.layout_mut().bb_mut(*entry).insts_mut().extend([res]);
                 res
@@ -418,6 +471,11 @@ impl RelExp {
             RelExp::Gt(rel_exp, add_exp) => {
                 let left = rel_exp.gen_ir(data, entry, var);
                 let right = add_exp.gen_ir(data, entry, var);
+                if let Some(rv) = get_const_int(data, left) {
+                    if let Some(rv1) = get_const_int(data, right) {
+                        return data.dfg_mut().new_value().integer((rv > rv1) as i32);
+                    }
+                }
                 let res = data.dfg_mut().new_value().binary(BinaryOp::Gt, left, right);
                 data.layout_mut().bb_mut(*entry).insts_mut().extend([res]);
                 res
@@ -425,6 +483,11 @@ impl RelExp {
             RelExp::Ge(rel_exp, add_exp) => {
                 let left = rel_exp.gen_ir(data, entry, var);
                 let right = add_exp.gen_ir(data, entry, var);
+                if let Some(rv) = get_const_int(data, left) {
+                    if let Some(rv1) = get_const_int(data, right) {
+                        return data.dfg_mut().new_value().integer((rv >= rv1) as i32);
+                    }
+                }
                 let res = data.dfg_mut().new_value().binary(BinaryOp::Ge, left, right);
                 data.layout_mut().bb_mut(*entry).insts_mut().extend([res]);
                 res
@@ -445,6 +508,11 @@ impl EqExp {
             EqExp::Eq(eq_exp, rel_exp) => {
                 let left = eq_exp.gen_ir(data, entry, var);
                 let right = rel_exp.gen_ir(data, entry, var);
+                if let Some(rv) = get_const_int(data, left) {
+                    if let Some(rv1) = get_const_int(data, right) {
+                        return data.dfg_mut().new_value().integer((rv == rv1) as i32);
+                    }
+                }
                 let res = data.dfg_mut().new_value().binary(BinaryOp::Eq, left, right);
                 data.layout_mut().bb_mut(*entry).insts_mut().extend([res]);
                 res
@@ -452,6 +520,11 @@ impl EqExp {
             EqExp::Ne(eq_exp, rel_exp) => {
                 let left = eq_exp.gen_ir(data, entry, var);
                 let right = rel_exp.gen_ir(data, entry, var);
+                if let Some(rv) = get_const_int(data, left) {
+                    if let Some(rv1) = get_const_int(data, right) {
+                        return data.dfg_mut().new_value().integer((rv != rv1) as i32);
+                    }
+                }
                 let res = data
                     .dfg_mut()
                     .new_value()
@@ -473,14 +546,32 @@ impl LAndExp {
         match self {
             LAndExp::EqExp(eq_exp) => eq_exp.gen_ir(data, entry, var),
             LAndExp::And(l_and_exp, eq_exp) => {
+                let zero = data.dfg_mut().new_value().integer(0);
                 let left = l_and_exp.gen_ir(data, entry, var);
+                if let Some(rv) = get_const_int(data, left) {
+                    if rv == 0 {
+                        return zero;
+                    }
+                    let right = eq_exp.gen_ir(data, entry, var);
+                    if let Some(rv1) = get_const_int(data, right) {
+                        return data.dfg_mut().new_value().integer((rv1 != 0) as i32);
+                    }
+                    let valright = data
+                        .dfg_mut()
+                        .new_value()
+                        .binary(BinaryOp::NotEq, right, zero);
+                    data.layout_mut()
+                        .bb_mut(*entry)
+                        .insts_mut()
+                        .extend([valright]);
+                    return valright;
+                }
                 let mut bb1 = data.dfg_mut().new_bb().basic_block(None);
                 let bb3 = data.dfg_mut().new_bb().basic_block(None);
                 let _ = data.layout_mut().bbs_mut().push_key_back(bb1);
                 let _ = data.layout_mut().bbs_mut().push_key_back(bb3);
                 let br1 = data.dfg_mut().new_value().branch(left, bb1, bb3);
                 // 先定义一个结果变量，初始是 0
-                let zero = data.dfg_mut().new_value().integer(0);
                 let res = data.dfg_mut().new_value().alloc(Type::get_i32());
                 let assign0 = data.dfg_mut().new_value().store(zero, res);
                 data.layout_mut()
@@ -521,14 +612,32 @@ impl LOrExp {
             LOrExp::LAndExp(l_and_exp) => l_and_exp.gen_ir(data, entry, var),
             LOrExp::Or(l_or_exp, l_and_exp) => {
                 let left = l_or_exp.gen_ir(data, entry, var);
+                let one = data.dfg_mut().new_value().integer(1);
+                let zero = data.dfg_mut().new_value().integer(0);
+                if let Some(rv) = get_const_int(data, left) {
+                    if rv == 1 {
+                        return one;
+                    }
+                    let right = l_and_exp.gen_ir(data, entry, var);
+                    if let Some(rv1) = get_const_int(data, right) {
+                        return data.dfg_mut().new_value().integer((rv1 != 0) as i32);
+                    }
+                    let valright = data
+                        .dfg_mut()
+                        .new_value()
+                        .binary(BinaryOp::NotEq, right, zero);
+                    data.layout_mut()
+                        .bb_mut(*entry)
+                        .insts_mut()
+                        .extend([valright]);
+                    return valright;
+                }
                 let mut bb1 = data.dfg_mut().new_bb().basic_block(None);
                 let bb3 = data.dfg_mut().new_bb().basic_block(None);
                 let _ = data.layout_mut().bbs_mut().push_key_back(bb1);
                 let _ = data.layout_mut().bbs_mut().push_key_back(bb3);
                 let br1 = data.dfg_mut().new_value().branch(left, bb3, bb1);
                 // 先定义一个结果变量，初始是 1
-                let one = data.dfg_mut().new_value().integer(1);
-                let zero = data.dfg_mut().new_value().integer(0);
                 let res = data.dfg_mut().new_value().alloc(Type::get_i32());
                 let assign1 = data.dfg_mut().new_value().store(one, res);
                 data.layout_mut()

@@ -33,7 +33,7 @@ Decl: Decl = {
         }
         return Decl {defs: decl};
     },
-    "const" "int" <firdef: VarDef> <restdef: ("," VarDef)*> ";" => {
+    "const" "int" <firdef: ConstVarDef> <restdef: ("," ConstVarDef)*> ";" => {
         let mut decl = Vec::new();
         decl.push(Box::new(firdef));
         for (_, item) in restdef.into_iter() {
@@ -46,6 +46,10 @@ Decl: Decl = {
 VarDef: VarDef = {
     <id: Ident> => VarDef::Ident(id),
     <id: Ident> "=" <exp: Exp> => VarDef::IdentInit(id, Box::new(exp)),
+}
+
+ConstVarDef: VarDef = {
+    <id: Ident> "=" <exp: Exp> => VarDef::ConstIdentInit(id, Box::new(exp)),
 }
 
 FuncType: FuncType = "int" => FuncType::Int;

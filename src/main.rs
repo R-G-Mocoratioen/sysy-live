@@ -7,6 +7,7 @@ use std::io::Result;
 lalrpop_mod!(sysy);
 
 mod ast;
+mod constint;
 mod tokoopa;
 mod whilecontext;
 
