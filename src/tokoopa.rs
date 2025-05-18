@@ -438,46 +438,39 @@ impl LOrExp {
         match self {
             LOrExp::LAndExp(l_and_exp) => l_and_exp.gen_ir(data, entry, var),
             LOrExp::Or(l_or_exp, l_and_exp) => {
-                /*
-                let left = l_or_exp.gen_ir(data, entry, var);
-                let right = l_and_exp.gen_ir(data, entry, var);
-                let zero = data.dfg_mut().new_value().integer(0);
-                let t1 = data.dfg_mut().new_value().binary(BinaryOp::Or, left, right);
-                let t2 = data.dfg_mut().new_value().binary(BinaryOp::NotEq, zero, t1);
-                data.layout_mut()
-                    .bb_mut(*entry)
-                    .insts_mut()
-                    .extend([t1, t2]);
-                t2
-                */
-                /*
-                let val = exp.gen_ir(data, entry, var);
-                let _ = data.layout_mut().bbs_mut().push_key_back(bb1);
-                let _ = data.layout_mut().bbs_mut().push_key_back(bb3);
-                let br1 = data.dfg_mut().new_value().branch(val, bb1, bb3);
-                data.layout_mut().bb_mut(*entry).insts_mut().extend([br1]);
-                // if 里面
-                let mut myvar: HashMap<String, Value> = var.clone();
-                stmt.gen_ir(data, &mut bb1, &mut myvar);
-                let jto3 = data.dfg_mut().new_value().jump(bb3);
-                data.layout_mut().bb_mut(bb1).insts_mut().extend([jto3]);
-                // if 结束
-                *entry = bb3;
-                */
                 let left = l_or_exp.gen_ir(data, entry, var);
                 let mut bb1 = data.dfg_mut().new_bb().basic_block(None);
                 let bb3 = data.dfg_mut().new_bb().basic_block(None);
+                let _ = data.layout_mut().bbs_mut().push_key_back(bb1);
+                let _ = data.layout_mut().bbs_mut().push_key_back(bb3);
                 let br1 = data.dfg_mut().new_value().branch(left, bb3, bb1);
                 // 先定义一个结果变量，初始是 1
                 let one = data.dfg_mut().new_value().integer(1);
+                let zero = data.dfg_mut().new_value().integer(0);
                 let res = data.dfg_mut().new_value().alloc(Type::get_i32());
                 let assign1 = data.dfg_mut().new_value().store(one, res);
                 data.layout_mut()
                     .bb_mut(*entry)
                     .insts_mut()
                     .extend([res, assign1, br1]);
-                // bb3 就是计算 right
-                let right = l_and_exp.gen_ir(data, &mut bb3, var);
+                // bb1 就是计算 right
+                let right = l_and_exp.gen_ir(data, &mut bb1, var);
+                let valright = data
+                    .dfg_mut()
+                    .new_value()
+                    .binary(BinaryOp::NotEq, right, zero);
+                let assignright = data.dfg_mut().new_value().store(valright, res);
+                let br2 = data.dfg_mut().new_value().jump(bb3);
+                data.layout_mut()
+                    .bb_mut(bb1)
+                    .insts_mut()
+                    .extend([valright, assignright, br2]);
+                // bb3 返回 res
+                *entry = bb3;
+                let getres = data.dfg_mut().new_value().load(res);
+                data.layout_mut().bb_mut(bb3).insts_mut().extend([getres]);
+                return getres;
+                //res 还必须 alloc
             }
         }
     }
