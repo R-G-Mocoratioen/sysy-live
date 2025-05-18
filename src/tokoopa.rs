@@ -407,22 +407,37 @@ impl LAndExp {
             LAndExp::EqExp(eq_exp) => eq_exp.gen_ir(data, entry, var),
             LAndExp::And(l_and_exp, eq_exp) => {
                 let left = l_and_exp.gen_ir(data, entry, var);
-                let right = eq_exp.gen_ir(data, entry, var);
+                let mut bb1 = data.dfg_mut().new_bb().basic_block(None);
+                let bb3 = data.dfg_mut().new_bb().basic_block(None);
+                let _ = data.layout_mut().bbs_mut().push_key_back(bb1);
+                let _ = data.layout_mut().bbs_mut().push_key_back(bb3);
+                let br1 = data.dfg_mut().new_value().branch(left, bb1, bb3);
+                // 先定义一个结果变量，初始是 0
                 let zero = data.dfg_mut().new_value().integer(0);
-                let t1 = data
-                    .dfg_mut()
-                    .new_value()
-                    .binary(BinaryOp::NotEq, left, zero);
-                let t2 = data
-                    .dfg_mut()
-                    .new_value()
-                    .binary(BinaryOp::NotEq, right, zero);
-                let t3 = data.dfg_mut().new_value().binary(BinaryOp::And, t1, t2);
+                let res = data.dfg_mut().new_value().alloc(Type::get_i32());
+                let assign0 = data.dfg_mut().new_value().store(zero, res);
                 data.layout_mut()
                     .bb_mut(*entry)
                     .insts_mut()
-                    .extend([t1, t2, t3]);
-                t3
+                    .extend([res, assign0, br1]);
+                // bb1 就是计算 right
+                let right = eq_exp.gen_ir(data, &mut bb1, var);
+                let valright = data
+                    .dfg_mut()
+                    .new_value()
+                    .binary(BinaryOp::NotEq, right, zero);
+                let assignright = data.dfg_mut().new_value().store(valright, res);
+                let br2 = data.dfg_mut().new_value().jump(bb3);
+                data.layout_mut()
+                    .bb_mut(bb1)
+                    .insts_mut()
+                    .extend([valright, assignright, br2]);
+                // bb3 返回 res
+                *entry = bb3;
+                let getres = data.dfg_mut().new_value().load(res);
+                data.layout_mut().bb_mut(bb3).insts_mut().extend([getres]);
+                return getres;
+                //res 还必须 alloc
             }
         }
     }
