@@ -35,6 +35,9 @@ pub enum Stmt {
     Block(Box<Block>),
     If(Box<Exp>, Box<Stmt>),
     IfElse(Box<Exp>, Box<Stmt>, Box<Stmt>),
+    While(Box<Exp>, Box<Stmt>),
+    Break,
+    Continue,
 }
 
 #[derive(Debug)]

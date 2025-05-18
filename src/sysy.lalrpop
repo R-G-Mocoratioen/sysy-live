@@ -76,11 +76,15 @@ MatchedStmt: Stmt = {
     "return" <optexp: OptionExp> ";" => Stmt::Return(Box::new(optexp)),
     <block: Block> => Stmt::Block(Box::new(block)),
     "if" "(" <exp: Exp> ")" <stmt1: MatchedStmt> "else" <stmt2: MatchedStmt> => Stmt::IfElse(Box::new(exp), Box::new(stmt1), Box::new(stmt2)),
+    "while" "(" <exp: Exp> ")" <stmt: MatchedStmt> => Stmt::While(Box::new(exp), Box::new(stmt)),
+    "break" ";" => Stmt::Break,
+    "continue" ";" => Stmt::Continue,
 }
 
 UnMatchedStmt: Stmt = {
     "if" "(" <exp: Exp> ")" <stmt: Stmt> => Stmt::If(Box::new(exp), Box::new(stmt)),
     "if" "(" <exp: Exp> ")" <stmt1: MatchedStmt> "else" <stmt2: UnMatchedStmt> => Stmt::IfElse(Box::new(exp), Box::new(stmt1), Box::new(stmt2)),
+    "while" "(" <exp: Exp> ")" <stmt: UnMatchedStmt> => Stmt::While(Box::new(exp), Box::new(stmt)),
 }
 
 Exp: Exp = <lorexp: LOrExp> => Exp { lorexp: Box::new(lorexp) };

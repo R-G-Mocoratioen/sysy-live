@@ -8,6 +8,7 @@ lalrpop_mod!(sysy);
 
 mod ast;
 mod tokoopa;
+mod whilecontext;
 
 fn main() -> Result<()> {
     let args: Vec<String> = env::args().collect();

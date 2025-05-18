@@ -1,4 +1,5 @@
 use crate::ast::*;
+use crate::whilecontext::*;
 use koopa::ir::builder_traits::*;
 use koopa::ir::*;
 use std::collections::HashMap;
@@ -27,7 +28,7 @@ impl FuncDef {
         let mut entry = main_data.dfg_mut().new_bb().basic_block(None);
         let _ = main_data.layout_mut().bbs_mut().push_key_back(entry);
 
-        self.block.gen_ir(main_data, &mut entry, &mut var);
+        self.block.gen_ir(main_data, &mut entry, &mut var, None);
 
         // add an unreachable "return 0" at the end
 
@@ -83,10 +84,11 @@ impl Block {
         data: &mut FunctionData,
         entry: &mut BasicBlock,
         var: &mut HashMap<String, Value>,
+        lastwhile: Option<WhileContext>,
     ) {
         let mut myvar: HashMap<String, Value> = var.clone();
         for item in &self.vecitem {
-            item.gen_ir(data, entry, &mut myvar);
+            item.gen_ir(data, entry, &mut myvar, lastwhile.clone());
         }
     }
 }
@@ -97,9 +99,10 @@ impl BlockItem {
         data: &mut FunctionData,
         entry: &mut BasicBlock,
         var: &mut HashMap<String, Value>,
+        lastwhile: Option<WhileContext>,
     ) {
         match self {
-            BlockItem::Stmt(stmt) => stmt.gen_ir(data, entry, var),
+            BlockItem::Stmt(stmt) => stmt.gen_ir(data, entry, var, lastwhile),
             BlockItem::Decl(decl) => decl.gen_ir(data, entry, var),
         }
     }
@@ -111,8 +114,72 @@ impl Stmt {
         data: &mut FunctionData,
         entry: &mut BasicBlock,
         var: &mut HashMap<String, Value>,
+        lastwhile: Option<WhileContext>,
     ) {
         match self {
+            Stmt::Break => {
+                if let Some(context) = lastwhile {
+                    let jump = data.dfg_mut().new_value().jump(context.while_end);
+                    data.layout_mut().bb_mut(*entry).insts_mut().extend([jump]);
+                    // needs a new basic block after this
+                    *entry = data.dfg_mut().new_bb().basic_block(None);
+                    let _ = data.layout_mut().bbs_mut().push_key_back(*entry);
+                } else {
+                    panic!("Break statement outside of loop");
+                }
+            }
+            Stmt::Continue => {
+                if let Some(context) = lastwhile {
+                    let jump = data.dfg_mut().new_value().jump(context.while_cond);
+                    data.layout_mut().bb_mut(*entry).insts_mut().extend([jump]);
+                    // needs a new basic block after this
+                    *entry = data.dfg_mut().new_bb().basic_block(None);
+                    let _ = data.layout_mut().bbs_mut().push_key_back(*entry);
+                } else {
+                    panic!("Continue statement outside of loop");
+                }
+            }
+            Stmt::While(exp, stmt) => {
+                let mut while_cond = data.dfg_mut().new_bb().basic_block(None);
+                let mut while_body = data.dfg_mut().new_bb().basic_block(None);
+                let while_end = data.dfg_mut().new_bb().basic_block(None);
+                let curwhile = WhileContext {
+                    while_cond: while_cond.clone(),
+                    while_end: while_end.clone(),
+                };
+                let curwhilebody = while_body.clone();
+                let _ = data.layout_mut().bbs_mut().push_key_back(while_cond);
+                let _ = data.layout_mut().bbs_mut().push_key_back(while_body);
+                let _ = data.layout_mut().bbs_mut().push_key_back(while_end);
+                let jumpcur = data.dfg_mut().new_value().jump(curwhile.while_cond);
+                data.layout_mut()
+                    .bb_mut(*entry)
+                    .insts_mut()
+                    .extend([jumpcur]);
+
+                // while_cond
+                let valexp = exp.gen_ir(data, &mut while_cond, var);
+                let jumpexp =
+                    data.dfg_mut()
+                        .new_value()
+                        .branch(valexp, curwhilebody, curwhile.while_end);
+                data.layout_mut()
+                    .bb_mut(while_cond)
+                    .insts_mut()
+                    .extend([jumpexp]);
+
+                // while_body
+                let mut myvar: HashMap<String, Value> = var.clone();
+                stmt.gen_ir(data, &mut while_body, &mut myvar, Some(curwhile.clone()));
+                let jumpstmt = data.dfg_mut().new_value().jump(curwhile.while_cond);
+                data.layout_mut()
+                    .bb_mut(while_body)
+                    .insts_mut()
+                    .extend([jumpstmt]);
+
+                // while_end
+                *entry = while_end;
+            }
             Stmt::Assign(id, exp) => {
                 let opt = var.get(id).cloned();
                 if let Some(val) = opt {
@@ -141,7 +208,7 @@ impl Stmt {
                 }
             }
             Stmt::Block(block) => {
-                block.gen_ir(data, entry, var);
+                block.gen_ir(data, entry, var, lastwhile);
             }
             Stmt::If(exp, stmt) => {
                 let val = exp.gen_ir(data, entry, var);
@@ -153,7 +220,7 @@ impl Stmt {
                 data.layout_mut().bb_mut(*entry).insts_mut().extend([br1]);
                 // if 里面
                 let mut myvar: HashMap<String, Value> = var.clone();
-                stmt.gen_ir(data, &mut bb1, &mut myvar);
+                stmt.gen_ir(data, &mut bb1, &mut myvar, lastwhile);
                 let jto3 = data.dfg_mut().new_value().jump(bb3);
                 data.layout_mut().bb_mut(bb1).insts_mut().extend([jto3]);
                 // if 结束
@@ -172,8 +239,8 @@ impl Stmt {
                 // if, else 里面
                 let mut myvar1: HashMap<String, Value> = var.clone();
                 let mut myvar2: HashMap<String, Value> = var.clone();
-                ifstmt.gen_ir(data, &mut bb1, &mut myvar1);
-                elsestmt.gen_ir(data, &mut bb2, &mut myvar2);
+                ifstmt.gen_ir(data, &mut bb1, &mut myvar1, lastwhile.clone());
+                elsestmt.gen_ir(data, &mut bb2, &mut myvar2, lastwhile.clone());
                 let jto3 = data.dfg_mut().new_value().jump(bb3);
                 data.layout_mut().bb_mut(bb1).insts_mut().extend([jto3]);
                 data.layout_mut().bb_mut(bb2).insts_mut().extend([jto3]);
