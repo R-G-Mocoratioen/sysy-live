@@ -1,11 +1,25 @@
 #[derive(Debug)]
 pub struct CompUnit {
-    pub func_def: FuncDef,
+    pub func_defs: Vec<FuncDef>,
+    pub global_var_defs: Vec<Decl>,
 }
+
+#[derive(Debug)]
+pub enum GlobalDef {
+    FuncDef(FuncDef),
+    Decl(Decl),
+}
+
+#[derive(Debug)]
+pub struct FuncParam {
+    pub id: String,
+}
+// 目前只有 int 一个类型。
 
 #[derive(Debug)]
 pub struct FuncDef {
     pub func_type: FuncType,
+    pub params: Vec<FuncParam>,
     pub id: String,
     pub block: Block,
 }
@@ -13,6 +27,7 @@ pub struct FuncDef {
 #[derive(Debug)]
 pub enum FuncType {
     Int,
+    Void,
 }
 
 #[derive(Debug)]
@@ -67,6 +82,7 @@ pub enum VarDef {
 #[derive(Debug)]
 pub enum UnaryExp {
     PrimaryExp(Box<PrimaryExp>),
+    FuncCall(String, Vec<Box<Exp>>),
     Pos(Box<UnaryExp>),
     Neg(Box<UnaryExp>),
     Not(Box<UnaryExp>),

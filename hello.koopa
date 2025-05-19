@@ -1,29 +1,82 @@
-fun @main(): i32 {
-%0:
-  %1 = alloc i32
-  %2 = alloc i32
-  store 21, %2
-  %3 = load %2
-  %4 = add %3, 1
-  store %4, %1
-  %5 = alloc i32
-  %6 = load %1
-  %7 = sub 147, %6
-  store %7, %5
-  %8 = alloc i32
-  %9 = load %2
-  %10 = sub 147, %9
-  store %10, %8
-  %11 = load %8
-  %12 = mul %11, 1
-  %13 = mul %12, 1
-  %14 = mul %13, 1
-  store %14, %8
-  %15 = load %5
-  %16 = load %8
-  %17 = add %15, %16
-  ret %17
+global %0 = alloc i32, 1
+global %1 = alloc i32, 1
 
-%18:
+fun @0pseudo() {
+%2:
+  ret
+}
+
+decl @getint(): i32
+
+decl @getch(): i32
+
+decl @getarray(*i32): i32
+
+decl @putint(i32)
+
+decl @putch(i32)
+
+decl @putarray(i32, *i32)
+
+decl @starttime()
+
+decl @stoptime()
+
+fun @f() {
+%3:
+  %4 = alloc i32
+  store 21, %4
+  %5 = alloc i32
+  %6 = load %4
+  %7 = load %4
+  %8 = mul %6, %7
+  store %8, %5
+  ret
+}
+
+fun @g(%9: i32, %10: i32, %11: i32): i32 {
+%12:
+  %13 = alloc i32
+  store %9, %13
+  %14 = alloc i32
+  store %10, %14
+  %15 = alloc i32
+  store %11, %15
+  %16 = load %13
+  %17 = sub 21, %16
+  %18 = load %14
+  %19 = load %15
+  %20 = mul %18, %19
+  %21 = add %17, %20
+  %22 = add %21, 1
+  %23 = load %0
+  %24 = load %1
+  %25 = mod %23, %24
+  %26 = add %22, %25
+  ret %26
+
+%27:
+  ret 0
+}
+
+fun @main(): i32 {
+%28:
+  call @f()
+  %29 = alloc i32
+  %30 = call @g(2, 3, 4)
+  store %30, %29
+  %31 = load %29
+  %32 = load %29
+  %33 = load %29
+  %34 = load %29
+  %35 = call @g(%32, %33, %34)
+  %36 = load %29
+  %37 = call @g(%31, %35, %36)
+  %38 = load %29
+  %39 = sub %37, %38
+  call @putint(%39)
+  ret 0
+
+%40:
   ret 0
 }

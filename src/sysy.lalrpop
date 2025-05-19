@@ -15,13 +15,58 @@ match {
 
 // 定义 CompUnit, 其返回值类型为 String
 // parser 在解析完成后的行为是返回 FuncDef 的值
-pub CompUnit: CompUnit = <func_def: FuncDef> => CompUnit { <> };
+pub CompUnit: CompUnit = {
+    <def: GlobalDef+> => {
+        let mut func_defs = Vec::new();
+        let mut global_var_defs = Vec::new();
+        for item in def.into_iter() {
+            match item {
+                GlobalDef::FuncDef(funcdef) => func_defs.push(funcdef),
+                GlobalDef::Decl(decl) => global_var_defs.push(decl),
+            }
+        }
+        return CompUnit { func_defs: func_defs, global_var_defs: global_var_defs };
+    },
+}
 
-// 同上, 不解释
+/*
 FuncDef: FuncDef = {
-  <func_type: FuncType> <id: Ident> "(" ")" <block: Block> => {
-    FuncDef { <> }
-  }
+    <func_type: FuncType> <id: Ident> "(" ")" <block: Block> => {
+        return FuncDef { func_type: func_type, params: Vec::new(), id: id, block: block };
+    },
+    <func_type: FuncType> <id: Ident> "(" <params: FuncDefParams> ")" <block: Block> => {
+        return FuncDef { func_type: func_type, params: params, id: id, block: block };
+    }
+}
+*/
+
+GlobalDef: GlobalDef = {
+    <decl: Decl> => GlobalDef::Decl(decl),
+    "int" <id: Ident> "(" <params: FuncDefParams?> ")" <block: Block> => {
+        return GlobalDef::FuncDef(FuncDef {
+            func_type: FuncType::Int, params: params.unwrap_or(Vec::new()), id: id, block: block 
+        });
+    },
+    "void" <id: Ident> "(" <params: FuncDefParams?> ")" <block: Block> => {
+        return GlobalDef::FuncDef(FuncDef {
+            func_type: FuncType::Void, params: params.unwrap_or(Vec::new()), id: id, block: block 
+        });
+    }
+}
+
+FuncDefParams: Vec<FuncParam> = {
+    <par: FuncDefParam> <restpar: ("," FuncDefParam)*> => {
+        let mut params = Vec::new();
+        params.push(par);
+        for (_, item) in restpar.into_iter() {
+            params.push(item);
+        }
+        return params;
+    },
+}
+
+FuncDefParam: FuncParam = {
+    "int" <id: Ident> => FuncParam { id: id },
 }
 
 Decl: Decl = {
@@ -52,7 +97,10 @@ ConstVarDef: VarDef = {
     <id: Ident> "=" <exp: Exp> => VarDef::ConstIdentInit(id, Box::new(exp)),
 }
 
-FuncType: FuncType = "int" => FuncType::Int;
+FuncType: FuncType = {
+    "int" => FuncType::Int,
+    "void" => FuncType::Void,
+}
 
 Block: Block = "{" <blockitem: BlockItem*> "}" => {
     let mut block = Vec::new();
@@ -103,9 +151,22 @@ PrimaryExp: PrimaryExp = {
 
 UnaryExp: UnaryExp = {
     <primexp: PrimaryExp> => UnaryExp::PrimaryExp(Box::new(primexp)),
+    <id: Ident> "(" ")" => UnaryExp::FuncCall(id, Vec::new()),
+    <id: Ident> "(" <args: FuncCallArgs> ")" => UnaryExp::FuncCall(id, args),
     "+" <unexp: UnaryExp> => UnaryExp::Pos(Box::new(unexp)),
     "-" <unexp: UnaryExp> => UnaryExp::Neg(Box::new(unexp)),
     "!" <unexp: UnaryExp> => UnaryExp::Not(Box::new(unexp)),
+}
+
+FuncCallArgs: Vec<Box<Exp>> = {
+    <exp: Exp> <restexp: ("," Exp)*> => {
+        let mut args = Vec::new();
+        args.push(Box::new(exp));
+        for (_, item) in restexp.into_iter() {
+            args.push(Box::new(item));
+        }
+        return args;
+    },
 }
 
 MulExp: MulExp = {

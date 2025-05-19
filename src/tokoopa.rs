@@ -1,40 +1,221 @@
 use crate::ast::*;
 use crate::constint::*;
+use crate::ident::*;
 use crate::whilecontext::*;
 use koopa::ir::builder_traits::*;
 use koopa::ir::*;
 use std::collections::HashMap;
 
 impl CompUnit {
+    fn adddecl(
+        &self,
+        program: &mut Program,
+        var: &mut HashMap<String, IdentValue>,
+        id: String,
+        rettype: Type,
+        paramtype: Vec<Type>,
+    ) {
+        let func = program.new_func(FunctionData::new(
+            ("@".to_owned() + &id).into(),
+            paramtype,
+            rettype,
+        ));
+        var.insert(id.clone(), IdentValue::Func(func));
+    }
+
+    /*
+    decl @getint(): i32
+    decl @getch(): i32
+    decl @getarray(*i32): i32
+    decl @putint(i32)
+    decl @putch(i32)
+    decl @putarray(i32, *i32)
+    decl @starttime()
+    decl @stoptime()
+    */
+    fn gen_libfuncs(&self, program: &mut Program, var: &mut HashMap<String, IdentValue>) {
+        self.adddecl(program, var, "getint".into(), Type::get_i32(), Vec::new());
+        self.adddecl(program, var, "getch".into(), Type::get_i32(), Vec::new());
+        self.adddecl(
+            program,
+            var,
+            "getarray".into(),
+            Type::get_i32(),
+            vec![Type::get_pointer(Type::get_i32())],
+        );
+        self.adddecl(
+            program,
+            var,
+            "putint".into(),
+            Type::get_unit(),
+            vec![Type::get_i32()],
+        );
+        self.adddecl(
+            program,
+            var,
+            "putch".into(),
+            Type::get_unit(),
+            vec![Type::get_i32()],
+        );
+        self.adddecl(
+            program,
+            var,
+            "putarray".into(),
+            Type::get_unit(),
+            vec![Type::get_i32(), Type::get_pointer(Type::get_i32())],
+        );
+        self.adddecl(
+            program,
+            var,
+            "starttime".into(),
+            Type::get_unit(),
+            Vec::new(),
+        );
+        self.adddecl(
+            program,
+            var,
+            "stoptime".into(),
+            Type::get_unit(),
+            Vec::new(),
+        );
+    }
+
     pub fn gen_ir(&self) -> Program {
         let mut program = Program::new();
+        let mut var: HashMap<String, IdentValue> = HashMap::new();
+        let mut tmpmap: HashMap<String, i32> = HashMap::new();
+        {
+            // 只能定义一个伪函数
+            let pseudo = program.new_func(FunctionData::new(
+                "@__pseudo__please_dont_give_same_name".into(),
+                Vec::new(),
+                Type::get_unit(),
+            ));
+            let pseudo_data = program.func_mut(pseudo);
+            let mut entry = pseudo_data.dfg_mut().new_bb().basic_block(None);
+            let _ = pseudo_data.layout_mut().bbs_mut().push_key_back(entry);
+            for decl in self.global_var_defs.iter() {
+                for vardef in decl.defs.iter() {
+                    match vardef.as_ref() {
+                        VarDef::Ident(id) => {
+                            tmpmap.insert(id.clone(), 0);
+                        }
+                        VarDef::IdentInit(id, exp) => {
+                            let val = exp.gen_ir(pseudo_data, &mut entry, &mut var);
+                            if let Some(res) = get_const_int(pseudo_data, val) {
+                                tmpmap.insert(id.clone(), res);
+                            } else {
+                                panic!("global initial value not a constant");
+                            }
+                        }
+                        VarDef::ConstIdentInit(id, exp) => {
+                            let val = exp.gen_ir(pseudo_data, &mut entry, &mut var);
+                            if let Some(res) = get_const_int(pseudo_data, val) {
+                                tmpmap.insert(id.clone(), res.clone());
+                                var.insert(id.clone(), IdentValue::ConstValue(res));
+                            } else {
+                                panic!("global initial value not a constant");
+                            }
+                        }
+                    }
+                }
+            }
+            let ret = pseudo_data.dfg_mut().new_value().ret(None);
+            pseudo_data
+                .layout_mut()
+                .bb_mut(entry)
+                .insts_mut()
+                .extend([ret]);
+        }
 
-        self.func_def.gen_ir(&mut program);
+        println!("successfully found the real values of all const global vars");
+
+        {
+            // 把值 alloc 进去
+            for decl in self.global_var_defs.iter() {
+                for vardef in decl.defs.iter() {
+                    match vardef.as_ref() {
+                        VarDef::Ident(id) => {
+                            let me = program.new_value().integer(tmpmap.get(id).unwrap().clone());
+                            let alloc = program.new_value().global_alloc(me);
+                            var.insert(id.clone(), IdentValue::Value(alloc));
+                        }
+                        VarDef::IdentInit(id, _) => {
+                            let me = program.new_value().integer(tmpmap.get(id).unwrap().clone());
+                            let alloc = program.new_value().global_alloc(me);
+                            var.insert(id.clone(), IdentValue::Value(alloc));
+                        }
+                        VarDef::ConstIdentInit(_, _) => {}
+                    }
+                }
+            }
+        }
+
+        println!("successfully built global vars");
+
+        self.gen_libfuncs(&mut program, &mut var);
+
+        for func in self.func_defs.iter() {
+            let mut typevec = Vec::new();
+
+            for _ in func.params.iter() {
+                typevec.push(Type::get_i32()); // 目前只有 int 一个类型
+            }
+
+            let main = program.new_func(FunctionData::new(
+                ("@".to_owned() + &func.id).into(),
+                typevec,
+                match func.func_type {
+                    FuncType::Int => Type::get_i32(),
+                    FuncType::Void => Type::get_unit(),
+                },
+            ));
+            var.insert(func.id.clone(), IdentValue::Func(main));
+        }
+
+        for func in self.func_defs.iter() {
+            let main = var.get(&func.id).unwrap().clone();
+            if let IdentValue::Func(main) = main {
+                func.gen_ir(main, &mut program, &mut var);
+            }
+        }
 
         program
     }
 }
 
 impl FuncDef {
-    fn gen_ir(&self, program: &mut Program) {
-        let main = program.new_func(FunctionData::new(
-            ("@".to_owned() + &self.id).into(),
-            Vec::new(),
-            Type::get_i32(),
-        ));
-
+    fn gen_ir(&self, main: Function, program: &mut Program, var: &mut HashMap<String, IdentValue>) {
         let main_data = program.func_mut(main);
-        let mut var: HashMap<String, Value> = HashMap::new();
+        // let mut var: HashMap<String, IdentValue> = HashMap::new();
 
         let mut entry = main_data.dfg_mut().new_bb().basic_block(None);
         let _ = main_data.layout_mut().bbs_mut().push_key_back(entry);
 
-        self.block.gen_ir(main_data, &mut entry, &mut var, None);
+        let mut myvar = var.clone();
 
-        // add an unreachable "return 0" at the end
+        let mut id = 0;
+        for param in self.params.iter() {
+            let alloc = main_data.dfg_mut().new_value().alloc(Type::get_i32());
+            let funcparamval = main_data.params()[id];
+            let load = main_data.dfg_mut().new_value().store(funcparamval, alloc);
+            main_data
+                .layout_mut()
+                .bb_mut(entry)
+                .insts_mut()
+                .extend([alloc, load]);
+            myvar.insert(param.id.clone(), IdentValue::Value(alloc));
+            id += 1;
+        }
 
+        self.block.gen_ir(main_data, &mut entry, &mut myvar, None);
+
+        // add an unreachable "return" at the end
         let zero = main_data.dfg_mut().new_value().integer(0);
-        let ret = main_data.dfg_mut().new_value().ret(Some(zero));
+        let ret = main_data.dfg_mut().new_value().ret(match self.func_type {
+            FuncType::Int => Some(zero),
+            FuncType::Void => None,
+        });
         main_data
             .layout_mut()
             .bb_mut(entry)
@@ -48,18 +229,18 @@ impl VarDef {
         &self,
         data: &mut FunctionData,
         entry: &mut BasicBlock,
-        var: &mut HashMap<String, Value>,
+        var: &mut HashMap<String, IdentValue>,
     ) {
         match self {
             VarDef::Ident(id) => {
                 let alloc = data.dfg_mut().new_value().alloc(Type::get_i32());
                 data.layout_mut().bb_mut(*entry).insts_mut().extend([alloc]);
-                var.insert(id.clone(), alloc);
+                var.insert(id.clone(), IdentValue::Value(alloc));
             }
             VarDef::IdentInit(id, exp) => {
                 let alloc = data.dfg_mut().new_value().alloc(Type::get_i32());
                 data.layout_mut().bb_mut(*entry).insts_mut().extend([alloc]);
-                var.insert(id.clone(), alloc);
+                var.insert(id.clone(), IdentValue::Value(alloc));
                 let val = exp.gen_ir(data, entry, var);
                 let store = data.dfg_mut().new_value().store(val, alloc);
                 data.layout_mut().bb_mut(*entry).insts_mut().extend([store]);
@@ -67,7 +248,10 @@ impl VarDef {
             VarDef::ConstIdentInit(id, exp) => {
                 let val = exp.gen_ir(data, entry, var);
                 assert!(data.dfg_mut().value(val).kind().is_const());
-                var.insert(id.clone(), val); // const 变量直接存值
+                var.insert(
+                    id.clone(),
+                    IdentValue::ConstValue(get_const_int(data, val).unwrap().clone()),
+                ); // const 变量直接存值
             }
         }
     }
@@ -78,7 +262,7 @@ impl Decl {
         &self,
         data: &mut FunctionData,
         entry: &mut BasicBlock,
-        var: &mut HashMap<String, Value>,
+        var: &mut HashMap<String, IdentValue>,
     ) {
         for item in self.defs.iter() {
             item.gen_ir(data, entry, var);
@@ -91,10 +275,10 @@ impl Block {
         &self,
         data: &mut FunctionData,
         entry: &mut BasicBlock,
-        var: &mut HashMap<String, Value>,
+        var: &mut HashMap<String, IdentValue>,
         lastwhile: Option<WhileContext>,
     ) {
-        let mut myvar: HashMap<String, Value> = var.clone();
+        let mut myvar: HashMap<String, IdentValue> = var.clone();
         for item in &self.vecitem {
             item.gen_ir(data, entry, &mut myvar, lastwhile.clone());
         }
@@ -106,7 +290,7 @@ impl BlockItem {
         &self,
         data: &mut FunctionData,
         entry: &mut BasicBlock,
-        var: &mut HashMap<String, Value>,
+        var: &mut HashMap<String, IdentValue>,
         lastwhile: Option<WhileContext>,
     ) {
         match self {
@@ -121,7 +305,7 @@ impl Stmt {
         &self,
         data: &mut FunctionData,
         entry: &mut BasicBlock,
-        var: &mut HashMap<String, Value>,
+        var: &mut HashMap<String, IdentValue>,
         lastwhile: Option<WhileContext>,
     ) {
         match self {
@@ -177,7 +361,7 @@ impl Stmt {
                     .extend([jumpexp]);
 
                 // while_body
-                let mut myvar: HashMap<String, Value> = var.clone();
+                let mut myvar: HashMap<String, IdentValue> = var.clone();
                 stmt.gen_ir(data, &mut while_body, &mut myvar, Some(curwhile.clone()));
                 let jumpstmt = data.dfg_mut().new_value().jump(curwhile.while_cond);
                 data.layout_mut()
@@ -190,10 +374,12 @@ impl Stmt {
             }
             Stmt::Assign(id, exp) => {
                 let opt = var.get(id).cloned();
-                if let Some(val) = opt {
+                if let Some(IdentValue::Value(val)) = opt {
                     let valexp = exp.gen_ir(data, entry, var);
                     let store = data.dfg_mut().new_value().store(valexp, val);
                     data.layout_mut().bb_mut(*entry).insts_mut().extend([store]);
+                } else {
+                    panic!("trying to assign a function or a const var {}", id);
                 }
             }
             Stmt::Return(optexp) => {
@@ -227,7 +413,7 @@ impl Stmt {
                 let br1 = data.dfg_mut().new_value().branch(val, bb1, bb3);
                 data.layout_mut().bb_mut(*entry).insts_mut().extend([br1]);
                 // if 里面
-                let mut myvar: HashMap<String, Value> = var.clone();
+                let mut myvar: HashMap<String, IdentValue> = var.clone();
                 stmt.gen_ir(data, &mut bb1, &mut myvar, lastwhile);
                 let jto3 = data.dfg_mut().new_value().jump(bb3);
                 data.layout_mut().bb_mut(bb1).insts_mut().extend([jto3]);
@@ -245,8 +431,8 @@ impl Stmt {
                 let br1 = data.dfg_mut().new_value().branch(val, bb1, bb2);
                 data.layout_mut().bb_mut(*entry).insts_mut().extend([br1]);
                 // if, else 里面
-                let mut myvar1: HashMap<String, Value> = var.clone();
-                let mut myvar2: HashMap<String, Value> = var.clone();
+                let mut myvar1: HashMap<String, IdentValue> = var.clone();
+                let mut myvar2: HashMap<String, IdentValue> = var.clone();
                 ifstmt.gen_ir(data, &mut bb1, &mut myvar1, lastwhile.clone());
                 elsestmt.gen_ir(data, &mut bb2, &mut myvar2, lastwhile.clone());
                 let jto3 = data.dfg_mut().new_value().jump(bb3);
@@ -264,7 +450,7 @@ impl Exp {
         &self,
         data: &mut FunctionData,
         entry: &mut BasicBlock,
-        var: &mut HashMap<String, Value>,
+        var: &mut HashMap<String, IdentValue>,
     ) -> Value {
         self.lorexp.gen_ir(data, entry, var)
     }
@@ -275,7 +461,7 @@ impl PrimaryExp {
         &self,
         data: &mut FunctionData,
         entry: &mut BasicBlock,
-        var: &mut HashMap<String, Value>,
+        var: &mut HashMap<String, IdentValue>,
     ) -> Value {
         match self {
             PrimaryExp::Exp(exp) => exp.gen_ir(data, entry, var),
@@ -284,14 +470,19 @@ impl PrimaryExp {
                 val
             }
             PrimaryExp::LVal(id) => {
-                if let Some(val) = var.get(id) {
-                    if data.dfg_mut().value(val.clone()).kind().is_const() {
-                        // 常量
-                        return val.clone();
+                if let Some(val) = var.get(id).cloned() {
+                    match val {
+                        IdentValue::Func(_) => panic!("Function {} used as variable", id),
+                        IdentValue::Value(val) => {
+                            let load = data.dfg_mut().new_value().load(val);
+                            data.layout_mut().bb_mut(*entry).insts_mut().extend([load]);
+                            return load;
+                        }
+                        IdentValue::ConstValue(val) => {
+                            let nval = data.dfg_mut().new_value().integer(val);
+                            return nval;
+                        }
                     }
-                    let load = data.dfg_mut().new_value().load(*val);
-                    data.layout_mut().bb_mut(*entry).insts_mut().extend([load]);
-                    load
                 } else {
                     panic!("Variable {} not found", id);
                 }
@@ -305,7 +496,7 @@ impl UnaryExp {
         &self,
         data: &mut FunctionData,
         entry: &mut BasicBlock,
-        var: &mut HashMap<String, Value>,
+        var: &mut HashMap<String, IdentValue>,
     ) -> Value {
         match self {
             UnaryExp::PrimaryExp(primary_exp) => primary_exp.gen_ir(data, entry, var),
@@ -330,6 +521,24 @@ impl UnaryExp {
                 data.layout_mut().bb_mut(*entry).insts_mut().extend([res]);
                 res
             }
+            UnaryExp::FuncCall(id, args) => {
+                if let Some(undefval) = var.get(id).cloned() {
+                    match undefval {
+                        IdentValue::Func(func) => {
+                            let mut argvec = Vec::new();
+                            for arg in args.iter() {
+                                let val = arg.gen_ir(data, entry, var);
+                                argvec.push(val);
+                            }
+                            let call = data.dfg_mut().new_value().call(func, argvec);
+                            data.layout_mut().bb_mut(*entry).insts_mut().extend([call]);
+                            return call;
+                        }
+                        _ => panic!("Variable {} used as function", id),
+                    }
+                }
+                panic!("function {} not found", id);
+            }
         }
     }
 }
@@ -339,7 +548,7 @@ impl MulExp {
         &self,
         data: &mut FunctionData,
         entry: &mut BasicBlock,
-        var: &mut HashMap<String, Value>,
+        var: &mut HashMap<String, IdentValue>,
     ) -> Value {
         match self {
             MulExp::UnaryExp(unary_exp) => unary_exp.gen_ir(data, entry, var),
@@ -397,7 +606,7 @@ impl AddExp {
         &self,
         data: &mut FunctionData,
         entry: &mut BasicBlock,
-        var: &mut HashMap<String, Value>,
+        var: &mut HashMap<String, IdentValue>,
     ) -> Value {
         match self {
             AddExp::MulExp(mul_exp) => mul_exp.gen_ir(data, entry, var),
@@ -440,7 +649,7 @@ impl RelExp {
         &self,
         data: &mut FunctionData,
         entry: &mut BasicBlock,
-        var: &mut HashMap<String, Value>,
+        var: &mut HashMap<String, IdentValue>,
     ) -> Value {
         match self {
             RelExp::AddExp(add_exp) => add_exp.gen_ir(data, entry, var),
@@ -501,7 +710,7 @@ impl EqExp {
         &self,
         data: &mut FunctionData,
         entry: &mut BasicBlock,
-        var: &mut HashMap<String, Value>,
+        var: &mut HashMap<String, IdentValue>,
     ) -> Value {
         match self {
             EqExp::RelExp(rel_exp) => rel_exp.gen_ir(data, entry, var),
@@ -541,7 +750,7 @@ impl LAndExp {
         &self,
         data: &mut FunctionData,
         entry: &mut BasicBlock,
-        var: &mut HashMap<String, Value>,
+        var: &mut HashMap<String, IdentValue>,
     ) -> Value {
         match self {
             LAndExp::EqExp(eq_exp) => eq_exp.gen_ir(data, entry, var),
@@ -606,7 +815,7 @@ impl LOrExp {
         &self,
         data: &mut FunctionData,
         entry: &mut BasicBlock,
-        var: &mut HashMap<String, Value>,
+        var: &mut HashMap<String, IdentValue>,
     ) -> Value {
         match self {
             LOrExp::LAndExp(l_and_exp) => l_and_exp.gen_ir(data, entry, var),

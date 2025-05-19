@@ -1,10 +1,19 @@
+const int b = 2, d = b + 1;
+int a = 1, c = d - b;
+
+void f() {
+    const int k = 10 + 11, y = k;
+    int x = y, z = x * x;
+}
+
+int g(int x, int y, int z) {
+    const int w = 10 + 11;
+    return w - x + (y * z) + (d / b) + (a % c);
+}
+
 int main() {
-  int x;
-  const int k = 10 + 11;
-  int y = k;
-  x = y + 1;
-  const int n = k * 7;
-  int z = n - x, w = n - y;
-  w = w * 1 * 1 * 1;
-  return z + w;
+    f();
+    int x = g(2, 3, 4);
+    putint(g(x, g(x, x, x), x) - x);
+    return 0;
 }
