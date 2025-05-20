@@ -44,7 +44,7 @@ pub enum BlockItem {
 
 #[derive(Debug)]
 pub enum Stmt {
-    Assign(String, Box<Exp>),
+    Assign(LVal, Box<Exp>),
     Return(Box<Option<Exp>>),
     Do(Box<Option<Exp>>),
     Block(Box<Block>),
@@ -61,9 +61,15 @@ pub struct Exp {
 }
 
 #[derive(Debug)]
+pub enum LVal {
+    Ident(String),
+    Array(String, Vec<Box<Exp>>),
+}
+
+#[derive(Debug)]
 pub enum PrimaryExp {
     Exp(Box<Exp>),
-    LVal(String),
+    LVal(LVal),
     Number(i32),
 }
 
@@ -73,8 +79,16 @@ pub struct Decl {
 }
 
 #[derive(Debug)]
+pub enum ArrayInit {
+    Single(Box<Exp>),
+    Multiple(Vec<Box<ArrayInit>>),
+}
+
+#[derive(Debug)]
 pub enum VarDef {
     Ident(String),
+    Array(String, Vec<Box<Exp>>),
+    ArrayInit(String, Vec<Box<Exp>>, Box<ArrayInit>),
     IdentInit(String, Box<Exp>),
     ConstIdentInit(String, Box<Exp>),
 }

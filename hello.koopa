@@ -1,7 +1,8 @@
 global %0 = alloc i32, 1
 global %1 = alloc i32, 1
+global @x = alloc [[i32, 3], 3], {{10, zeroinit, zeroinit}, zeroinit, zeroinit}
 
-fun @0pseudo() {
+fun @__pseudo__please_dont_give_same_name() {
 %2:
   ret
 }
@@ -24,6 +25,7 @@ decl @stoptime()
 
 fun @f() {
 %3:
+  @tmp = alloc [[i32, 3], 3], zeroinit
   %4 = alloc i32
   store 21, %4
   %5 = alloc i32
@@ -31,52 +33,54 @@ fun @f() {
   %7 = load %4
   %8 = mul %6, %7
   store %8, %5
+  %9 = load %4
+  %10 = load %5
   ret
 }
 
-fun @g(%9: i32, %10: i32, %11: i32): i32 {
-%12:
-  %13 = alloc i32
-  store %9, %13
-  %14 = alloc i32
-  store %10, %14
-  %15 = alloc i32
-  store %11, %15
-  %16 = load %13
-  %17 = sub 21, %16
-  %18 = load %14
-  %19 = load %15
-  %20 = mul %18, %19
-  %21 = add %17, %20
-  %22 = add %21, 1
-  %23 = load %0
-  %24 = load %1
-  %25 = mod %23, %24
-  %26 = add %22, %25
-  ret %26
+fun @g(%12: i32, %13: i32, %14: i32): i32 {
+%15:
+  %16 = alloc i32
+  store %12, %16
+  %17 = alloc i32
+  store %13, %17
+  %18 = alloc i32
+  store %14, %18
+  %19 = load %16
+  %20 = sub 21, %19
+  %21 = load %17
+  %22 = load %18
+  %23 = mul %21, %22
+  %24 = add %20, %23
+  %25 = add %24, 1
+  %26 = load %0
+  %27 = load %1
+  %28 = mod %26, %27
+  %29 = add %25, %28
+  ret %29
 
-%27:
+%30:
   ret 0
 }
 
 fun @main(): i32 {
-%28:
+%31:
   call @f()
-  %29 = alloc i32
-  %30 = call @g(2, 3, 4)
-  store %30, %29
-  %31 = load %29
-  %32 = load %29
-  %33 = load %29
-  %34 = load %29
-  %35 = call @g(%32, %33, %34)
-  %36 = load %29
-  %37 = call @g(%31, %35, %36)
-  %38 = load %29
-  %39 = sub %37, %38
-  call @putint(%39)
+  %32 = alloc i32
+  %33 = call @g(2, 3, 4)
+  store %33, %32
+  %34 = load %32
+  %35 = load %32
+  %36 = load %32
+  %37 = load %32
+  %38 = call @g(%35, %36, %37)
+  %39 = load %32
+  %40 = call @g(%34, %38, %39)
+  %41 = load %32
+  %42 = sub %40, %41
+  call @putint(%42)
   ret 0
 
-%40:
+%43:
   ret 0
 }

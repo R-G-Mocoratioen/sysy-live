@@ -1,5 +1,7 @@
+use crate::arrayinit::*;
 use crate::ast::*;
 use crate::constint::*;
+use crate::ident;
 use crate::ident::*;
 use crate::whilecontext::*;
 use koopa::ir::builder_traits::*;
@@ -84,6 +86,8 @@ impl CompUnit {
         let mut program = Program::new();
         let mut var: HashMap<String, IdentValue> = HashMap::new();
         let mut tmpmap: HashMap<String, i32> = HashMap::new();
+        let mut initmap: HashMap<String, GlobalArrayInit> = HashMap::new();
+        let mut sizemap: HashMap<String, Vec<i32>> = HashMap::new();
         {
             // 只能定义一个伪函数
             let pseudo = program.new_func(FunctionData::new(
@@ -116,6 +120,41 @@ impl CompUnit {
                             } else {
                                 panic!("global initial value not a constant");
                             }
+                        }
+                        // 对于数组，init value 和 size 都是常数，都需要借助 pseudo 函数来计算
+                        // size 用 sizemap 寸
+                        // initvalue 用 initmap 存
+                        VarDef::Array(id, exps) => {
+                            let mut lens: Vec<i32> = Vec::new();
+                            for exp in exps.iter() {
+                                let val = exp.gen_ir(pseudo_data, &mut entry, &mut var);
+                                if let Some(res) = get_const_int(pseudo_data, val) {
+                                    lens.push(res);
+                                } else {
+                                    panic!("global array size not a constant");
+                                }
+                            }
+                            sizemap.insert(id.clone(), lens.clone());
+                        }
+                        VarDef::ArrayInit(id, exps, arrayinit) => {
+                            let mut lens: Vec<i32> = Vec::new();
+                            for exp in exps.iter() {
+                                let val = exp.gen_ir(pseudo_data, &mut entry, &mut var);
+                                if let Some(res) = get_const_int(pseudo_data, val) {
+                                    lens.push(res);
+                                } else {
+                                    panic!("global array size not a constant");
+                                }
+                            }
+                            sizemap.insert(id.clone(), lens.clone());
+                            let res = gen_globalarrayinit(
+                                pseudo_data,
+                                &mut entry,
+                                &mut var,
+                                lens,
+                                arrayinit,
+                            );
+                            initmap.insert(id.clone(), res);
                         }
                     }
                 }
@@ -224,6 +263,65 @@ impl FuncDef {
     }
 }
 
+impl ArrayInit {
+    fn gen_ir(
+        &self,
+        data: &mut FunctionData,
+        entry: &mut BasicBlock,
+        var: &mut HashMap<String, IdentValue>,
+        alloc: Value,
+        lens: Vec<i32>,
+    ) {
+        let mut curpos = 0;
+        match self {
+            ArrayInit::Single(exp) => panic!("using an exp to init an array"),
+            ArrayInit::Multiple(inits) => {
+                for cur in inits.iter() {
+                    match cur {
+                        ArrayInit::Single(exp) => {
+                            let val = exp.gen_ir(data, entry, var);
+                            let at = gen_arrayelem_ptr(data, entry, alloc, curpos, lens.clone());
+                            let store = data.dfg_mut().new_value().store(val, at);
+                            data.layout_mut().bb_mut(*entry).insts_mut().extend([store]);
+                            curpos += 1;
+                        }
+                        ArrayInit::Multiple(inits) => {
+                            if curpos % lens.last().unwrap() != 0 {
+                                panic!("bad array initializer");
+                            }
+                            let respr = find_firstok(curpos, lens.clone());
+                            let firstok = respr.0;
+                            let curcur = respr.1;
+                            // 用 inits 去匹配 firstok 之后的
+                            let at = gen_arrayelem_ptr(
+                                data,
+                                entry,
+                                alloc,
+                                curpos / curcur,
+                                lens.clone()[0..firstok].to_vec(),
+                            );
+                            let mut tmp: i32 = 0;
+                            inits.gen_ir(data, entry, var, at, lens.clone()[firstok..].to_vec());
+                            curpos += lens.clone()[firstok..]
+                                .to_vec()
+                                .iter()
+                                .fold(1, |acc, x| acc * x);
+                        }
+                    }
+                }
+                let all = lens.iter().fold(1, |acc, x| acc * x);
+                while curpos < all {
+                    let val = data.dfg_mut().new_value().integer(0);
+                    let at = gen_arrayelem_ptr(data, entry, alloc, curpos, lens.clone());
+                    let store = data.dfg_mut().new_value().store(val, at);
+                    data.layout_mut().bb_mut(*entry).insts_mut().extend([store]);
+                    curpos += 1;
+                }
+            }
+        }
+    }
+}
+
 impl VarDef {
     fn gen_ir(
         &self,
@@ -252,6 +350,43 @@ impl VarDef {
                     id.clone(),
                     IdentValue::ConstValue(get_const_int(data, val).unwrap().clone()),
                 ); // const 变量直接存值
+            }
+            VarDef::Array(id, exps) => {
+                let mut lens: Vec<i32> = Vec::new();
+                for exp in exps.iter() {
+                    let val = exp.gen_ir(data, entry, var);
+                    if let Some(rv) = get_const_int(data, val) {
+                        lens.push(rv);
+                    } else {
+                        panic!("array size of array {} is not a constant", id);
+                    }
+                }
+                let mut curtype = Type::get_i32();
+                for dim in lens.iter().rev() {
+                    curtype = Type::get_array(curtype, dim as usize);
+                }
+                let alloc = data.dfg_mut().new_value().alloc(curtype);
+                data.layout_mut().bb_mut(*entry).insts_mut().extend([alloc]);
+                var.insert(id.clone(), IdentValue::Value(alloc));
+            }
+            VarDef::ArrayInit(id, exps, arrayinit) => {
+                let mut lens: Vec<i32> = Vec::new();
+                for exp in exps.iter() {
+                    let val = exp.gen_ir(data, entry, var);
+                    if let Some(rv) = get_const_int(data, val) {
+                        lens.push(rv);
+                    } else {
+                        panic!("array size of array {} is not a constant", id);
+                    }
+                }
+                let mut curtype = Type::get_i32();
+                for dim in lens.iter().rev() {
+                    curtype = Type::get_array(curtype, dim as usize);
+                }
+                let alloc = data.dfg_mut().new_value().alloc(curtype);
+                data.layout_mut().bb_mut(*entry).insts_mut().extend([alloc]);
+                var.insert(id.clone(), IdentValue::Value(alloc));
+                arrayinit.gen_ir(data, entry, var, alloc, lens.clone());
             }
         }
     }
@@ -373,14 +508,15 @@ impl Stmt {
                 *entry = while_end;
             }
             Stmt::Assign(id, exp) => {
-                let opt = var.get(id).cloned();
-                if let Some(IdentValue::Value(val)) = opt {
-                    let valexp = exp.gen_ir(data, entry, var);
-                    let store = data.dfg_mut().new_value().store(valexp, val);
-                    data.layout_mut().bb_mut(*entry).insts_mut().extend([store]);
-                } else {
-                    panic!("trying to assign a function or a const var {}", id);
-                }
+                let val = id.gen_ir(data, entry, var, false);
+                let valexp = exp.gen_ir(data, entry, var);
+                let store = data.dfg_mut().new_value().store(valexp, val);
+                data.layout_mut().bb_mut(*entry).insts_mut().extend([store]);
+                // let opt = var.get(id).cloned();
+                // if let Some(IdentValue::Value(val)) = opt {
+                // } else {
+                //     panic!("trying to assign a function or a const var {}", id);
+                // }
             }
             Stmt::Return(optexp) => {
                 if let Some(exp) = (*optexp).as_ref() {
@@ -456,6 +592,73 @@ impl Exp {
     }
 }
 
+impl Lval {
+    fn gen_ir(
+        &self,
+        data: &mut FunctionData,
+        entry: &mut BasicBlock,
+        var: &mut HashMap<String, IdentValue>,
+        needload: Bool,
+    ) -> Value {
+        match self {
+            LVal::Ident(id) => {
+                if let Some(val) = var.get(id).cloned() {
+                    match val {
+                        IdentValue::Func(_) => panic!("Function {} used as variable", id),
+                        IdentValue::Value(val) => {
+                            if needload {
+                                let load = data.dfg_mut().new_value().load(val);
+                                data.layout_mut().bb_mut(*entry).insts_mut().extend([load]);
+                                return load;
+                            } else {
+                                return val;
+                            }
+                        }
+                        IdentValue::ConstValue(val) => {
+                            let nval = data.dfg_mut().new_value().integer(val);
+                            return nval;
+                        }
+                    }
+                } else {
+                    panic!("Variable {} not found", id);
+                }
+            }
+            LVal::Array(id, exps) => {
+                if let Some(val) = var.get(id).cloned() {
+                    match val {
+                        IdentValue::Func(_) => panic!("Function {} used as array", id),
+                        IdentValue::Value(val) => {
+                            let mut ptrval = val;
+                            for exp in exps.iter() {
+                                let expval = exp.gen_ir(data, entry, var);
+                                let newptr =
+                                    data.dfg_mut().new_value().get_elem_ptr(ptrval, expval);
+                                data.layout_mut()
+                                    .bb_mut(*entry)
+                                    .insts_mut()
+                                    .extend([newptr]);
+                                ptrval = newptr;
+                            }
+                            if needload {
+                                let load = data.dfg_mut().new_value().load(ptrval);
+                                data.layout_mut().bb_mut(*entry).insts_mut().extend([load]);
+                                return load;
+                            } else {
+                                return val;
+                            }
+                        }
+                        IdentValue::ConstValue(val) => {
+                            panic!("Variable {} has a type that is not array", id);
+                        }
+                    }
+                } else {
+                    panic!("Variable {} not found", id);
+                }
+            }
+        }
+    }
+}
+
 impl PrimaryExp {
     fn gen_ir(
         &self,
@@ -469,23 +672,9 @@ impl PrimaryExp {
                 let val = data.dfg_mut().new_value().integer(*num);
                 val
             }
-            PrimaryExp::LVal(id) => {
-                if let Some(val) = var.get(id).cloned() {
-                    match val {
-                        IdentValue::Func(_) => panic!("Function {} used as variable", id),
-                        IdentValue::Value(val) => {
-                            let load = data.dfg_mut().new_value().load(val);
-                            data.layout_mut().bb_mut(*entry).insts_mut().extend([load]);
-                            return load;
-                        }
-                        IdentValue::ConstValue(val) => {
-                            let nval = data.dfg_mut().new_value().integer(val);
-                            return nval;
-                        }
-                    }
-                } else {
-                    panic!("Variable {} not found", id);
-                }
+            PrimaryExp::LVal(lval) => {
+                let val = lval.gen_ir(data, entry, var, true);
+                val
             }
         }
     }

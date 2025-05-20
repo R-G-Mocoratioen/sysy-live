@@ -29,17 +29,6 @@ pub CompUnit: CompUnit = {
     },
 }
 
-/*
-FuncDef: FuncDef = {
-    <func_type: FuncType> <id: Ident> "(" ")" <block: Block> => {
-        return FuncDef { func_type: func_type, params: Vec::new(), id: id, block: block };
-    },
-    <func_type: FuncType> <id: Ident> "(" <params: FuncDefParams> ")" <block: Block> => {
-        return FuncDef { func_type: func_type, params: params, id: id, block: block };
-    }
-}
-*/
-
 GlobalDef: GlobalDef = {
     <decl: Decl> => GlobalDef::Decl(decl),
     "int" <id: Ident> "(" <params: FuncDefParams?> ")" <block: Block> => {
@@ -88,13 +77,47 @@ Decl: Decl = {
     }
 }
 
+ArrayInit: ArrayInit = {
+    <exp: Exp> => ArrayInit::Single(Box::new(exp)),
+    "{" "}" => ArrayInit::Multiple(Vec::new()),
+    "{" <exp: Exp> <restexp: ("," Exp)*> "}" => {
+        let mut exps = Vec::new();
+        exps.push(Box::new(exp));
+        for (_, item) in restexp.into_iter() {
+            exps.push(Box::new(item));
+        }
+        return ArrayInit::Multiple(exps);
+    },
+}
+
 VarDef: VarDef = {
     <id: Ident> => VarDef::Ident(id),
     <id: Ident> "=" <exp: Exp> => VarDef::IdentInit(id, Box::new(exp)),
+    <id: Ident> <dims: ("[" Exp "]")+> => {
+        let mut exps = Vec::new();
+        for (_, item, _) in dims.into_iter() {
+            exps.push(Box::new(item));
+        }
+        return VarDef::Array(id, exps);
+    }
+    <id: Ident> <dims: ("[" Exp "]")+> "=" <init: ArrayInit> => {
+        let mut exps = Vec::new();
+        for (_, item, _) in dims.into_iter() {
+            exps.push(Box::new(item));
+        }
+        return VarDef::Array(id, exps, Box::new(init));
+    }
 }
 
 ConstVarDef: VarDef = {
     <id: Ident> "=" <exp: Exp> => VarDef::ConstIdentInit(id, Box::new(exp)),
+    <id: Ident> <dims: ("[" Exp "]")+> "=" <init: ArrayInit> => {
+        let mut exps = Vec::new();
+        for (_, item, _) in dims.into_iter() {
+            exps.push(Box::new(item));
+        }
+        return VarDef::Array(id, exps, Box::new(init));
+    }
 }
 
 FuncType: FuncType = {
@@ -141,7 +164,16 @@ UnMatchedStmt: Stmt = {
 
 Exp: Exp = <lorexp: LOrExp> => Exp { lorexp: Box::new(lorexp) };
 
-LVal: String = <id: Ident> => <>;
+LVal: LVal = {
+    <id: Ident> => LVal::Ident(id),
+    <id: Ident> <dims: ("[" Exp "]")+> => {
+        let mut exps = Vec::new();
+        for (_, item, _) in dims.into_iter() {
+            exps.push(Box::new(item));
+        }
+        return LVal::Array(id, exps);
+    }
+}
 
 PrimaryExp: PrimaryExp = {
     "(" <exp: Exp> ")" => PrimaryExp::Exp(Box::new(exp)),

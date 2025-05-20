@@ -6,6 +6,7 @@ use std::io::Result;
 
 lalrpop_mod!(sysy);
 
+mod arrayinit;
 mod ast;
 mod constint;
 mod ident;
