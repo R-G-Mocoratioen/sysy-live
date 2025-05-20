@@ -61,6 +61,7 @@ pub fn gen_arrayelem_ptr(
             .insts_mut()
             .extend([newptr]);
         ptrval = newptr;
+        fir = false;
     }
     return ptrval;
 }

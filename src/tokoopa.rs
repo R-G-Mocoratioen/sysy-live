@@ -1,3 +1,5 @@
+// TODO: parse functions with array 参数; 全局的数组改定义返回 getelemptr 0
+
 use crate::arrayinit::*;
 use crate::ast::*;
 use crate::constint::*;
@@ -190,7 +192,7 @@ impl CompUnit {
                             let typ = gen_arraytype(len.clone());
                             let zero = program.new_value().zero_init(typ);
                             let alloc = program.new_value().global_alloc(zero);
-                            var.insert(id.clone(), IdentValue::Value(alloc));
+                            var.insert(id.clone(), IdentValue::Array(alloc));
                         }
                         VarDef::ArrayInit(id, _, _) => {
                             let len = sizemap.get(id).unwrap().clone();
@@ -200,7 +202,7 @@ impl CompUnit {
                                 initmap.get(id).unwrap().clone(),
                             );
                             let alloc = program.new_value().global_alloc(initv);
-                            var.insert(id.clone(), IdentValue::Value(alloc));
+                            var.insert(id.clone(), IdentValue::Array(alloc));
                         }
                     }
                 }
@@ -681,7 +683,7 @@ impl LVal {
                 if let Some(val) = var.get(id).cloned() {
                     match val {
                         IdentValue::Func(_) => panic!("Function {} used as array", id),
-                        IdentValue::Value(val) => panic!("Variable {} used as array", id),
+                        IdentValue::Value(_) => panic!("Variable {} used as array", id),
                         IdentValue::Array(val) => {
                             let mut ptrval = val;
                             let mut fir = true;
