@@ -1,11 +1,15 @@
 use crate::ast::*;
+use crate::constint::*;
 use crate::tokoopa::*;
+use koopa::ir::builder::ValueBuilder;
 use koopa::ir::*;
 
-pub enum GlobalArrayInit {
-    Single(i32),
-    ZeroInit,
-    Multiple(Vec<Box<GlobalArrayInit>>),
+pub fn gen_arraytype(lens: Vec<i32>) -> Type {
+    let mut curtype = Type::get_i32();
+    for dim in lens.iter().rev() {
+        curtype = Type::get_array(curtype, dim as usize);
+    }
+    return curtype;
 }
 
 pub fn find_firstok(curpos: i32, lens: Vec<i32>) -> (i32, i32) {
@@ -57,18 +61,21 @@ pub fn gen_globalarrayinit(
     var: &mut HashMap<String, IdentValue>,
     lens: Vec<i32>,
     initer: ArrayInit,
-) -> GlobalArrayInit {
+) -> Vec<i32> {
     let mut curpos = 0;
+    let mut curvec: Vec<i32> = Vec::new();
     match initer {
-        ArrayInit::Single(exp) => panic!("using an exp to init an array"),
+        ArrayInit::Single(exp) => panic!("using an exp to init a global array"),
         ArrayInit::Multiple(inits) => {
             for cur in inits.iter() {
                 match cur {
                     ArrayInit::Single(exp) => {
                         let val = exp.gen_ir(data, entry, var);
-                        let at = gen_arrayelem_ptr(data, entry, alloc, curpos, lens.clone());
-                        let store = data.dfg_mut().new_value().store(val, at);
-                        data.layout_mut().bb_mut(*entry).insts_mut().extend([store]);
+                        if let Some(rv) = get_const_int(data, val) {
+                            curvec.push(rv);
+                        } else {
+                            panic!("using a not const exp to init global array");
+                        }
                         curpos += 1;
                     }
                     ArrayInit::Multiple(inits) => {
@@ -79,15 +86,14 @@ pub fn gen_globalarrayinit(
                         let firstok = respr.0;
                         let curcur = respr.1;
                         // 用 inits 去匹配 firstok 之后的
-                        let at = gen_arrayelem_ptr(
+                        let newvec = gen_globalarrayinit(
                             data,
                             entry,
-                            alloc,
-                            curpos / curcur,
-                            lens.clone()[0..firstok].to_vec(),
+                            var,
+                            lens.clone()[firstok..].to_vec(),
+                            inits,
                         );
-                        let mut tmp: i32 = 0;
-                        inits.gen_ir(data, entry, var, at, lens.clone()[firstok..].to_vec());
+                        curvec.extend(&newvec);
                         curpos += lens.clone()[firstok..]
                             .to_vec()
                             .iter()
@@ -97,12 +103,40 @@ pub fn gen_globalarrayinit(
             }
             let all = lens.iter().fold(1, |acc, x| acc * x);
             while curpos < all {
-                let val = data.dfg_mut().new_value().integer(0);
-                let at = gen_arrayelem_ptr(data, entry, alloc, curpos, lens.clone());
-                let store = data.dfg_mut().new_value().store(val, at);
-                data.layout_mut().bb_mut(*entry).insts_mut().extend([store]);
+                curvec.push(0);
                 curpos += 1;
             }
         }
     }
+    return curvec;
+}
+
+pub fn gen_globalinitvalue(program: &mut Program, len: vec<i32>, all: vec<i32>) -> Value {
+    if all.iter().all(|&x| x == 0) {
+        return program.new_value().zero_init(gen_arraytype(len));
+    }
+    if len.len() == 1 {
+        // for each x in len, map x into f(x)
+        let mut elems: Vec<Value> = Vec::new();
+        for v in all.iter() {
+            let elem = program.new_value().integer(*v);
+            elems.push(elem);
+        }
+        return program.new_value().aggregate(elems);
+    }
+    let l = len[0];
+    let each = lens.clone()[1..].to_vec().iter().fold(1, |acc, x| acc * x);
+    let mut elems: Vec<Value> = Vec::new();
+    let mut all0 = true;
+    for i in [0..l] {
+        let left = i * each;
+        let right = (i + 1) * each;
+        let res = gen_globalinitvalue(
+            program,
+            len.clone()[1..].to_vec(),
+            all.clone()[left..right].to_vec(),
+        );
+        elems.push(res);
+    }
+    return program.new_value().aggregate(elems);
 }

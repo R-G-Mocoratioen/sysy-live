@@ -86,7 +86,7 @@ impl CompUnit {
         let mut program = Program::new();
         let mut var: HashMap<String, IdentValue> = HashMap::new();
         let mut tmpmap: HashMap<String, i32> = HashMap::new();
-        let mut initmap: HashMap<String, GlobalArrayInit> = HashMap::new();
+        let mut initmap: HashMap<String, Vec<i32>> = HashMap::new();
         let mut sizemap: HashMap<String, Vec<i32>> = HashMap::new();
         {
             // 只能定义一个伪函数
@@ -185,6 +185,24 @@ impl CompUnit {
                             var.insert(id.clone(), IdentValue::Value(alloc));
                         }
                         VarDef::ConstIdentInit(_, _) => {}
+                        VarDef::Array(id, _) => {
+                            let len = sizemap.get(id).unwrap().clone();
+                            let typ = gen_type(len.clone());
+                            let alloc = program
+                                .new_value()
+                                .global_alloc(program.new_value().zero_init(typ));
+                            var.insert(id.clone(), IdentValue::Value(alloc));
+                        }
+                        VarDef::ArrayInit(id, _, _) => {
+                            let len = sizemap.get(id).unwrap().clone();
+                            let initv = gen_globalinitvalue(
+                                &mut program,
+                                len.clone(),
+                                initmap.get(id).unwrap().clone(),
+                            );
+                            let alloc = program.new_value().global_alloc(initv);
+                            var.insert(id.clone(), IdentValue::Value(alloc));
+                        }
                     }
                 }
             }
@@ -300,7 +318,6 @@ impl ArrayInit {
                                 curpos / curcur,
                                 lens.clone()[0..firstok].to_vec(),
                             );
-                            let mut tmp: i32 = 0;
                             inits.gen_ir(data, entry, var, at, lens.clone()[firstok..].to_vec());
                             curpos += lens.clone()[firstok..]
                                 .to_vec()
@@ -361,10 +378,7 @@ impl VarDef {
                         panic!("array size of array {} is not a constant", id);
                     }
                 }
-                let mut curtype = Type::get_i32();
-                for dim in lens.iter().rev() {
-                    curtype = Type::get_array(curtype, dim as usize);
-                }
+                let mut curtype = gen_arraytype(lens);
                 let alloc = data.dfg_mut().new_value().alloc(curtype);
                 data.layout_mut().bb_mut(*entry).insts_mut().extend([alloc]);
                 var.insert(id.clone(), IdentValue::Value(alloc));
