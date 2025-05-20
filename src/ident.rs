@@ -4,5 +4,6 @@ use koopa::ir::*;
 pub enum IdentValue {
     Func(Function),
     Value(Value),
+    Array(Value),
     ConstValue(i32),
 }

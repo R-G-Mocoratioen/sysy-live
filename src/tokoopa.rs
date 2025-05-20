@@ -1,9 +1,9 @@
 use crate::arrayinit::*;
 use crate::ast::*;
 use crate::constint::*;
-use crate::ident;
 use crate::ident::*;
 use crate::whilecontext::*;
+use koopa::ir::builder::LocalInstBuilder;
 use koopa::ir::builder_traits::*;
 use koopa::ir::*;
 use std::collections::HashMap;
@@ -152,7 +152,7 @@ impl CompUnit {
                                 &mut entry,
                                 &mut var,
                                 lens,
-                                arrayinit,
+                                arrayinit.as_ref().clone(),
                             );
                             initmap.insert(id.clone(), res);
                         }
@@ -187,10 +187,9 @@ impl CompUnit {
                         VarDef::ConstIdentInit(_, _) => {}
                         VarDef::Array(id, _) => {
                             let len = sizemap.get(id).unwrap().clone();
-                            let typ = gen_type(len.clone());
-                            let alloc = program
-                                .new_value()
-                                .global_alloc(program.new_value().zero_init(typ));
+                            let typ = gen_arraytype(len.clone());
+                            let zero = program.new_value().zero_init(typ);
+                            let alloc = program.new_value().global_alloc(zero);
                             var.insert(id.clone(), IdentValue::Value(alloc));
                         }
                         VarDef::ArrayInit(id, _, _) => {
@@ -253,15 +252,35 @@ impl FuncDef {
 
         let mut id = 0;
         for param in self.params.iter() {
-            let alloc = main_data.dfg_mut().new_value().alloc(Type::get_i32());
-            let funcparamval = main_data.params()[id];
-            let load = main_data.dfg_mut().new_value().store(funcparamval, alloc);
-            main_data
-                .layout_mut()
-                .bb_mut(entry)
-                .insts_mut()
-                .extend([alloc, load]);
-            myvar.insert(param.id.clone(), IdentValue::Value(alloc));
+            match param {
+                FuncParam::Var(paramid) => {
+                    let alloc = main_data.dfg_mut().new_value().alloc(Type::get_i32());
+                    let funcparamval = main_data.params()[id];
+                    let load = main_data.dfg_mut().new_value().store(funcparamval, alloc);
+                    main_data
+                        .layout_mut()
+                        .bb_mut(entry)
+                        .insts_mut()
+                        .extend([alloc, load]);
+                    myvar.insert(paramid.clone(), IdentValue::Value(alloc));
+                }
+                FuncParam::Array(paramid, exps) => {
+                    let mut lens: Vec<i32> = Vec::new();
+                    for exp in exps.iter() {
+                        let val = exp.gen_ir(main_data, &mut entry, var);
+                        if let Some(rv) = get_const_int(main_data, val) {
+                            lens.push(rv);
+                        } else {
+                            panic!(
+                                "array size of array {} in funcdef is not a constant",
+                                paramid
+                            );
+                        }
+                    }
+                    let funcparamval = main_data.params()[id];
+                    myvar.insert(paramid.clone(), IdentValue::Array(funcparamval));
+                }
+            }
             id += 1;
         }
 
@@ -292,10 +311,10 @@ impl ArrayInit {
     ) {
         let mut curpos = 0;
         match self {
-            ArrayInit::Single(exp) => panic!("using an exp to init an array"),
+            ArrayInit::Single(_) => panic!("using an exp to init an array"),
             ArrayInit::Multiple(inits) => {
                 for cur in inits.iter() {
-                    match cur {
+                    match cur.as_ref() {
                         ArrayInit::Single(exp) => {
                             let val = exp.gen_ir(data, entry, var);
                             let at = gen_arrayelem_ptr(data, entry, alloc, curpos, lens.clone());
@@ -303,7 +322,7 @@ impl ArrayInit {
                             data.layout_mut().bb_mut(*entry).insts_mut().extend([store]);
                             curpos += 1;
                         }
-                        ArrayInit::Multiple(inits) => {
+                        ArrayInit::Multiple(_) => {
                             if curpos % lens.last().unwrap() != 0 {
                                 panic!("bad array initializer");
                             }
@@ -316,10 +335,16 @@ impl ArrayInit {
                                 entry,
                                 alloc,
                                 curpos / curcur,
-                                lens.clone()[0..firstok].to_vec(),
+                                lens.clone()[0..firstok as usize].to_vec(),
                             );
-                            inits.gen_ir(data, entry, var, at, lens.clone()[firstok..].to_vec());
-                            curpos += lens.clone()[firstok..]
+                            cur.gen_ir(
+                                data,
+                                entry,
+                                var,
+                                at,
+                                lens.clone()[firstok as usize..].to_vec(),
+                            );
+                            curpos += lens.clone()[firstok as usize..]
                                 .to_vec()
                                 .iter()
                                 .fold(1, |acc, x| acc * x);
@@ -378,10 +403,15 @@ impl VarDef {
                         panic!("array size of array {} is not a constant", id);
                     }
                 }
-                let mut curtype = gen_arraytype(lens);
+                let curtype = gen_arraytype(lens);
                 let alloc = data.dfg_mut().new_value().alloc(curtype);
-                data.layout_mut().bb_mut(*entry).insts_mut().extend([alloc]);
-                var.insert(id.clone(), IdentValue::Value(alloc));
+                let zero = data.dfg_mut().new_value().integer(0);
+                let getelem = data.dfg_mut().new_value().get_elem_ptr(alloc, zero);
+                data.layout_mut()
+                    .bb_mut(*entry)
+                    .insts_mut()
+                    .extend([alloc, getelem]);
+                var.insert(id.clone(), IdentValue::Array(getelem));
             }
             VarDef::ArrayInit(id, exps, arrayinit) => {
                 let mut lens: Vec<i32> = Vec::new();
@@ -393,13 +423,15 @@ impl VarDef {
                         panic!("array size of array {} is not a constant", id);
                     }
                 }
-                let mut curtype = Type::get_i32();
-                for dim in lens.iter().rev() {
-                    curtype = Type::get_array(curtype, dim as usize);
-                }
+                let curtype = gen_arraytype(lens.clone());
                 let alloc = data.dfg_mut().new_value().alloc(curtype);
-                data.layout_mut().bb_mut(*entry).insts_mut().extend([alloc]);
-                var.insert(id.clone(), IdentValue::Value(alloc));
+                let zero = data.dfg_mut().new_value().integer(0);
+                let getelem = data.dfg_mut().new_value().get_elem_ptr(alloc, zero);
+                data.layout_mut()
+                    .bb_mut(*entry)
+                    .insts_mut()
+                    .extend([alloc, getelem]);
+                var.insert(id.clone(), IdentValue::Array(getelem));
                 arrayinit.gen_ir(data, entry, var, alloc, lens.clone());
             }
         }
@@ -596,7 +628,7 @@ impl Stmt {
 }
 
 impl Exp {
-    fn gen_ir(
+    pub fn gen_ir(
         &self,
         data: &mut FunctionData,
         entry: &mut BasicBlock,
@@ -606,14 +638,15 @@ impl Exp {
     }
 }
 
-impl Lval {
+impl LVal {
     fn gen_ir(
         &self,
         data: &mut FunctionData,
         entry: &mut BasicBlock,
         var: &mut HashMap<String, IdentValue>,
-        needload: Bool,
+        needload: bool,
     ) -> Value {
+        // 左值不需要 needload，右值就需要 load
         match self {
             LVal::Ident(id) => {
                 if let Some(val) = var.get(id).cloned() {
@@ -628,6 +661,13 @@ impl Lval {
                                 return val;
                             }
                         }
+                        IdentValue::Array(val) => {
+                            if !needload {
+                                panic!("Array {} used as left value", id);
+                            }
+                            // 这里的 val 就是和 func 的 val 一样的传法
+                            return val;
+                        }
                         IdentValue::ConstValue(val) => {
                             let nval = data.dfg_mut().new_value().integer(val);
                             return nval;
@@ -641,28 +681,36 @@ impl Lval {
                 if let Some(val) = var.get(id).cloned() {
                     match val {
                         IdentValue::Func(_) => panic!("Function {} used as array", id),
-                        IdentValue::Value(val) => {
+                        IdentValue::Value(val) => panic!("Variable {} used as array", id),
+                        IdentValue::Array(val) => {
                             let mut ptrval = val;
+                            let mut fir = true;
                             for exp in exps.iter() {
                                 let expval = exp.gen_ir(data, entry, var);
-                                let newptr =
-                                    data.dfg_mut().new_value().get_elem_ptr(ptrval, expval);
+                                let mut newptr: Value;
+                                if fir {
+                                    newptr = data.dfg_mut().new_value().get_ptr(ptrval, expval);
+                                } else {
+                                    newptr =
+                                        data.dfg_mut().new_value().get_elem_ptr(ptrval, expval);
+                                }
                                 data.layout_mut()
                                     .bb_mut(*entry)
                                     .insts_mut()
                                     .extend([newptr]);
                                 ptrval = newptr;
+                                fir = false;
                             }
                             if needload {
                                 let load = data.dfg_mut().new_value().load(ptrval);
                                 data.layout_mut().bb_mut(*entry).insts_mut().extend([load]);
                                 return load;
                             } else {
-                                return val;
+                                return ptrval;
                             }
                         }
-                        IdentValue::ConstValue(val) => {
-                            panic!("Variable {} has a type that is not array", id);
+                        IdentValue::ConstValue(_) => {
+                            panic!("Const Variable {} is not array", id);
                         }
                     }
                 } else {

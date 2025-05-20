@@ -55,7 +55,14 @@ FuncDefParams: Vec<FuncParam> = {
 }
 
 FuncDefParam: FuncParam = {
-    "int" <id: Ident> => FuncParam { id: id },
+    "int" <id: Ident> => FuncParam::Var(id),
+    "int" <id: Ident> "[" "]" <dims: ("[" Exp "]")*> => {
+        let mut exps = Vec::new();
+        for (_, item, _) in dims.into_iter() {
+            exps.push(Box::new(item));
+        }
+        return FuncParam::Array(id, exps);
+    },
 }
 
 Decl: Decl = {
@@ -80,7 +87,7 @@ Decl: Decl = {
 ArrayInit: ArrayInit = {
     <exp: Exp> => ArrayInit::Single(Box::new(exp)),
     "{" "}" => ArrayInit::Multiple(Vec::new()),
-    "{" <exp: Exp> <restexp: ("," Exp)*> "}" => {
+    "{" <exp: ArrayInit> <restexp: ("," ArrayInit)*> "}" => {
         let mut exps = Vec::new();
         exps.push(Box::new(exp));
         for (_, item) in restexp.into_iter() {
@@ -99,13 +106,13 @@ VarDef: VarDef = {
             exps.push(Box::new(item));
         }
         return VarDef::Array(id, exps);
-    }
+    },
     <id: Ident> <dims: ("[" Exp "]")+> "=" <init: ArrayInit> => {
         let mut exps = Vec::new();
         for (_, item, _) in dims.into_iter() {
             exps.push(Box::new(item));
         }
-        return VarDef::Array(id, exps, Box::new(init));
+        return VarDef::ArrayInit(id, exps, Box::new(init));
     }
 }
 
@@ -116,7 +123,7 @@ ConstVarDef: VarDef = {
         for (_, item, _) in dims.into_iter() {
             exps.push(Box::new(item));
         }
-        return VarDef::Array(id, exps, Box::new(init));
+        return VarDef::ArrayInit(id, exps, Box::new(init));
     }
 }
 

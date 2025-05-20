@@ -1,22 +1,23 @@
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct CompUnit {
     pub func_defs: Vec<FuncDef>,
     pub global_var_defs: Vec<Decl>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum GlobalDef {
     FuncDef(FuncDef),
     Decl(Decl),
 }
 
-#[derive(Debug)]
-pub struct FuncParam {
-    pub id: String,
+#[derive(Debug, Clone)]
+pub enum FuncParam {
+    Var(String),
+    Array(String, Vec<Box<Exp>>),
 }
 // 目前只有 int 一个类型。
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct FuncDef {
     pub func_type: FuncType,
     pub params: Vec<FuncParam>,
@@ -24,25 +25,25 @@ pub struct FuncDef {
     pub block: Block,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum FuncType {
     Int,
     Void,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Block {
     // pub stmt: Stmt,
     pub vecitem: Vec<Box<BlockItem>>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum BlockItem {
     Stmt(Box<Stmt>),
     Decl(Box<Decl>),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Stmt {
     Assign(LVal, Box<Exp>),
     Return(Box<Option<Exp>>),
@@ -55,36 +56,36 @@ pub enum Stmt {
     Continue,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Exp {
     pub lorexp: Box<LOrExp>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum LVal {
     Ident(String),
     Array(String, Vec<Box<Exp>>),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum PrimaryExp {
     Exp(Box<Exp>),
     LVal(LVal),
     Number(i32),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Decl {
     pub defs: Vec<Box<VarDef>>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum ArrayInit {
     Single(Box<Exp>),
     Multiple(Vec<Box<ArrayInit>>),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum VarDef {
     Ident(String),
     Array(String, Vec<Box<Exp>>),
@@ -93,7 +94,7 @@ pub enum VarDef {
     ConstIdentInit(String, Box<Exp>),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum UnaryExp {
     PrimaryExp(Box<PrimaryExp>),
     FuncCall(String, Vec<Box<Exp>>),
@@ -102,7 +103,7 @@ pub enum UnaryExp {
     Not(Box<UnaryExp>),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum MulExp {
     UnaryExp(Box<UnaryExp>),
     Mul(Box<MulExp>, Box<UnaryExp>),
@@ -110,14 +111,14 @@ pub enum MulExp {
     Mod(Box<MulExp>, Box<UnaryExp>),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum AddExp {
     MulExp(Box<MulExp>),
     Add(Box<AddExp>, Box<MulExp>),
     Sub(Box<AddExp>, Box<MulExp>),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum RelExp {
     AddExp(Box<AddExp>),
     Lt(Box<RelExp>, Box<AddExp>),
@@ -126,20 +127,20 @@ pub enum RelExp {
     Ge(Box<RelExp>, Box<AddExp>),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum EqExp {
     RelExp(Box<RelExp>),
     Eq(Box<EqExp>, Box<RelExp>),
     Ne(Box<EqExp>, Box<RelExp>),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum LAndExp {
     EqExp(Box<EqExp>),
     And(Box<LAndExp>, Box<EqExp>),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum LOrExp {
     LAndExp(Box<LAndExp>),
     Or(Box<LOrExp>, Box<LAndExp>),
