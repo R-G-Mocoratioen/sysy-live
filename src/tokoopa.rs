@@ -843,7 +843,7 @@ impl UnaryExp {
             UnaryExp::Not(unary_exp) => {
                 let val = unary_exp.gen_ir(data, entry, var);
                 if let Some(rv) = get_const_int(data, val) {
-                    return data.dfg_mut().new_value().integer(!rv);
+                    return data.dfg_mut().new_value().integer((rv == 0) as i32);
                 }
                 let zero = data.dfg_mut().new_value().integer(0);
                 let res = data.dfg_mut().new_value().binary(BinaryOp::Eq, zero, val);
@@ -1153,7 +1153,7 @@ impl LOrExp {
                 let one = data.dfg_mut().new_value().integer(1);
                 let zero = data.dfg_mut().new_value().integer(0);
                 if let Some(rv) = get_const_int(data, left) {
-                    if rv == 1 {
+                    if rv != 0 {
                         return one;
                     }
                     let right = l_and_exp.gen_ir(data, entry, var);
