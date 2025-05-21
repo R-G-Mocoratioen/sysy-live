@@ -47,21 +47,14 @@ pub fn gen_arrayelem_ptr(
         tmp /= i;
     }
     let mut ptrval = alloc;
-    let mut fir = true;
     for i in ats.iter().rev() {
         let indexval = data.dfg_mut().new_value().integer(i.clone());
-        let mut newptr: Value;
-        if fir {
-            newptr = data.dfg_mut().new_value().get_ptr(ptrval, indexval);
-        } else {
-            newptr = data.dfg_mut().new_value().get_elem_ptr(ptrval, indexval);
-        }
+        let newptr = data.dfg_mut().new_value().get_elem_ptr(ptrval, indexval);
         data.layout_mut()
             .bb_mut(*entry)
             .insts_mut()
             .extend([newptr]);
         ptrval = newptr;
-        fir = false;
     }
     return ptrval;
 }

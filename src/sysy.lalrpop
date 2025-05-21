@@ -172,7 +172,7 @@ UnMatchedStmt: Stmt = {
 Exp: Exp = <lorexp: LOrExp> => Exp { lorexp: Box::new(lorexp) };
 
 LVal: LVal = {
-    <id: Ident> => LVal::Ident(id),
+    <id: Ident> => LVal::Ident(id), // 注意：Ident 不一定就真的对应了一个 数组！
     <id: Ident> <dims: ("[" Exp "]")+> => {
         let mut exps = Vec::new();
         for (_, item, _) in dims.into_iter() {

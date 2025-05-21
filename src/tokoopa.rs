@@ -161,6 +161,28 @@ impl CompUnit {
                     }
                 }
             }
+            // 还要处理函数里的数组维度问题！
+            for func in self.func_defs.iter() {
+                for param in func.params.iter() {
+                    match param {
+                        FuncParam::Var(_) => {}
+                        FuncParam::Array(paramid, exps) => {
+                            let mut lens: Vec<i32> = Vec::new();
+                            for exp in exps.iter() {
+                                let val = exp.gen_ir(pseudo_data, &mut entry, &mut var);
+                                if let Some(res) = get_const_int(pseudo_data, val) {
+                                    lens.push(res);
+                                } else {
+                                    panic!("global array size not a constant");
+                                }
+                            }
+                            let newparamid = func.id.clone() + "!" + paramid;
+                            sizemap.insert(newparamid.clone(), lens.clone());
+                        }
+                    }
+                }
+            }
+
             let ret = pseudo_data.dfg_mut().new_value().ret(None);
             pseudo_data
                 .layout_mut()
@@ -192,7 +214,7 @@ impl CompUnit {
                             let typ = gen_arraytype(len.clone());
                             let zero = program.new_value().zero_init(typ);
                             let alloc = program.new_value().global_alloc(zero);
-                            var.insert(id.clone(), IdentValue::Array(alloc));
+                            var.insert(id.clone(), IdentValue::Array(alloc, len.len() as i32));
                         }
                         VarDef::ArrayInit(id, _, _) => {
                             let len = sizemap.get(id).unwrap().clone();
@@ -202,7 +224,7 @@ impl CompUnit {
                                 initmap.get(id).unwrap().clone(),
                             );
                             let alloc = program.new_value().global_alloc(initv);
-                            var.insert(id.clone(), IdentValue::Array(alloc));
+                            var.insert(id.clone(), IdentValue::Array(alloc, len.len() as i32));
                         }
                     }
                 }
@@ -216,8 +238,22 @@ impl CompUnit {
         for func in self.func_defs.iter() {
             let mut typevec = Vec::new();
 
-            for _ in func.params.iter() {
-                typevec.push(Type::get_i32()); // 目前只有 int 一个类型
+            for param in func.params.iter() {
+                // typevec.push(Type::get_i32()); // 目前只有 int 一个类型
+                match param {
+                    FuncParam::Var(_) => {
+                        typevec.push(Type::get_i32());
+                    }
+                    FuncParam::Array(paramid, _) => {
+                        let newparamid = func.id.clone() + "!" + paramid;
+                        if let Some(lens) = sizemap.get(&newparamid) {
+                            let curtype = gen_arraytype(lens.clone());
+                            typevec.push(Type::get_pointer(curtype));
+                        } else {
+                            panic!("function {} param {} not found", func.id, paramid);
+                        }
+                    }
+                }
             }
 
             let main = program.new_func(FunctionData::new(
@@ -267,7 +303,7 @@ impl FuncDef {
                     myvar.insert(paramid.clone(), IdentValue::Value(alloc));
                 }
                 FuncParam::Array(paramid, exps) => {
-                    let mut lens: Vec<i32> = Vec::new();
+                    /*let mut lens: Vec<i32> = Vec::new();
                     for exp in exps.iter() {
                         let val = exp.gen_ir(main_data, &mut entry, var);
                         if let Some(rv) = get_const_int(main_data, val) {
@@ -278,9 +314,12 @@ impl FuncDef {
                                 paramid
                             );
                         }
-                    }
+                    }*/
                     let funcparamval = main_data.params()[id];
-                    myvar.insert(paramid.clone(), IdentValue::Array(funcparamval));
+                    myvar.insert(
+                        paramid.clone(),
+                        IdentValue::FuncArgumentArray(funcparamval, exps.len() as i32 + 1),
+                    );
                 }
             }
             id += 1;
@@ -407,13 +446,8 @@ impl VarDef {
                 }
                 let curtype = gen_arraytype(lens);
                 let alloc = data.dfg_mut().new_value().alloc(curtype);
-                let zero = data.dfg_mut().new_value().integer(0);
-                let getelem = data.dfg_mut().new_value().get_elem_ptr(alloc, zero);
-                data.layout_mut()
-                    .bb_mut(*entry)
-                    .insts_mut()
-                    .extend([alloc, getelem]);
-                var.insert(id.clone(), IdentValue::Array(getelem));
+                data.layout_mut().bb_mut(*entry).insts_mut().extend([alloc]);
+                var.insert(id.clone(), IdentValue::Array(alloc, exps.len() as i32));
             }
             VarDef::ArrayInit(id, exps, arrayinit) => {
                 let mut lens: Vec<i32> = Vec::new();
@@ -427,13 +461,8 @@ impl VarDef {
                 }
                 let curtype = gen_arraytype(lens.clone());
                 let alloc = data.dfg_mut().new_value().alloc(curtype);
-                let zero = data.dfg_mut().new_value().integer(0);
-                let getelem = data.dfg_mut().new_value().get_elem_ptr(alloc, zero);
-                data.layout_mut()
-                    .bb_mut(*entry)
-                    .insts_mut()
-                    .extend([alloc, getelem]);
-                var.insert(id.clone(), IdentValue::Array(getelem));
+                data.layout_mut().bb_mut(*entry).insts_mut().extend([alloc]);
+                var.insert(id.clone(), IdentValue::Array(alloc, exps.len() as i32));
                 arrayinit.gen_ir(data, entry, var, alloc, lens.clone());
             }
         }
@@ -663,12 +692,21 @@ impl LVal {
                                 return val;
                             }
                         }
-                        IdentValue::Array(val) => {
+                        IdentValue::FuncArgumentArray(val, _) => {
                             if !needload {
                                 panic!("Array {} used as left value", id);
                             }
                             // 这里的 val 就是和 func 的 val 一样的传法
                             return val;
+                        }
+                        IdentValue::Array(val, _) => {
+                            if !needload {
+                                panic!("Array {} used as left value", id);
+                            }
+                            let zero = data.dfg_mut().new_value().integer(0);
+                            let load = data.dfg_mut().new_value().get_elem_ptr(val, zero);
+                            data.layout_mut().bb_mut(*entry).insts_mut().extend([load]);
+                            return load;
                         }
                         IdentValue::ConstValue(val) => {
                             let nval = data.dfg_mut().new_value().integer(val);
@@ -684,12 +722,12 @@ impl LVal {
                     match val {
                         IdentValue::Func(_) => panic!("Function {} used as array", id),
                         IdentValue::Value(_) => panic!("Variable {} used as array", id),
-                        IdentValue::Array(val) => {
+                        IdentValue::FuncArgumentArray(val, dim) => {
                             let mut ptrval = val;
                             let mut fir = true;
                             for exp in exps.iter() {
                                 let expval = exp.gen_ir(data, entry, var);
-                                let mut newptr: Value;
+                                let newptr: Value;
                                 if fir {
                                     newptr = data.dfg_mut().new_value().get_ptr(ptrval, expval);
                                 } else {
@@ -704,10 +742,48 @@ impl LVal {
                                 fir = false;
                             }
                             if needload {
-                                let load = data.dfg_mut().new_value().load(ptrval);
+                                let load: Value;
+                                let zero = data.dfg_mut().new_value().integer(0);
+                                if exps.len() as i32 == dim {
+                                    load = data.dfg_mut().new_value().load(ptrval);
+                                } else {
+                                    load = data.dfg_mut().new_value().get_elem_ptr(ptrval, zero);
+                                }
                                 data.layout_mut().bb_mut(*entry).insts_mut().extend([load]);
                                 return load;
                             } else {
+                                if exps.len() as i32 != dim {
+                                    panic!("Array pointer {} used as left value", id);
+                                }
+                                return ptrval;
+                            }
+                        }
+                        IdentValue::Array(val, dim) => {
+                            let mut ptrval = val;
+                            for exp in exps.iter() {
+                                let expval = exp.gen_ir(data, entry, var);
+                                let newptr =
+                                    data.dfg_mut().new_value().get_elem_ptr(ptrval, expval);
+                                data.layout_mut()
+                                    .bb_mut(*entry)
+                                    .insts_mut()
+                                    .extend([newptr]);
+                                ptrval = newptr;
+                            }
+                            if needload {
+                                let load: Value;
+                                let zero = data.dfg_mut().new_value().integer(0);
+                                if exps.len() as i32 == dim {
+                                    load = data.dfg_mut().new_value().load(ptrval);
+                                } else {
+                                    load = data.dfg_mut().new_value().get_elem_ptr(ptrval, zero);
+                                }
+                                data.layout_mut().bb_mut(*entry).insts_mut().extend([load]);
+                                return load;
+                            } else {
+                                if exps.len() as i32 != dim {
+                                    panic!("Array pointer {} used as left value", id);
+                                }
                                 return ptrval;
                             }
                         }
