@@ -1,6 +1,13 @@
-const int buf[3][3][1] = { 1,{},2 }; 
-const int buf2[2][3] = {{}, 1};
+int a = 1;
+
+int f(){
+    a = a + 1;
+    return a;
+}
 
 int main() {
-  return buf2[1][0];
+  int u = f();
+  int v = f();
+  putint(u + v);
+  return 0;
 }

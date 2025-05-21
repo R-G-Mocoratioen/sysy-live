@@ -1,4 +1,6 @@
+use crate::riscv::GenerateAsm;
 use koopa::back::KoopaGenerator;
+use koopa::ir::*;
 use lalrpop_util::lalrpop_mod;
 use std::env;
 use std::fs::read_to_string;
@@ -10,10 +12,12 @@ mod arrayinit;
 mod ast;
 mod constint;
 mod ident;
+mod riscv;
 mod tokoopa;
 mod whilecontext;
 
 fn main() -> Result<()> {
+    Type::set_ptr_size(4);
     let args: Vec<String> = env::args().collect();
     // println!("{:?}", args);
     if args.len() != 5 || args[3] != "-o" {
@@ -22,12 +26,16 @@ fn main() -> Result<()> {
     }
     let input = read_to_string(args[2].clone())?;
     let ast = sysy::CompUnitParser::new().parse(&input).unwrap();
-    let program = ast.gen_ir();
+    let mut program = ast.gen_ir();
     if args[1] == "-koopa" {
         let mut gen = KoopaGenerator::new(Vec::new());
         gen.generate_on(&program).unwrap();
         let text_from_ir = std::str::from_utf8(&gen.writer()).unwrap().to_string();
         std::fs::write(args[4].clone(), text_from_ir)?;
+    }
+    if args[1] == "-riscv" || args[1] == "-perf" {
+        let str = program.to_riscv();
+        std::fs::write(args[4].clone(), str)?;
     }
     Ok(())
 }

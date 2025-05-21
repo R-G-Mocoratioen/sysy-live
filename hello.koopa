@@ -1,34 +1,24 @@
-global %0 = alloc [[[i32, 1], 3], 3], {{{1}, zeroinit, {2}}, zeroinit, zeroinit}
-global %1 = alloc [[i32, 3], 2], {zeroinit, {1, 0, 0}}
-
-fun @__pseudo__please_dont_give_same_name() {
-%2:
-  ret
-}
-
-decl @getint(): i32
-
-decl @getch(): i32
-
-decl @getarray(*i32): i32
-
-decl @putint(i32)
-
-decl @putch(i32)
-
-decl @putarray(i32, *i32)
-
-decl @starttime()
-
-decl @stoptime()
-
-fun @main(): i32 {
-%3:
-  %4 = getelemptr %1, 1
-  %5 = getelemptr %4, 0
-  %6 = load %5
-  ret %6
-
-%7:
-  ret 0
-}
+  .data
+  .text
+  .globl __pseudo__please_dont_give_same_name
+__pseudo__please_dont_give_same_name:
+  .globl getint
+getint:
+  .globl getch
+getch:
+  .globl getarray
+getarray:
+  .globl putint
+putint:
+  .globl putch
+putch:
+  .globl putarray
+putarray:
+  .globl starttime
+starttime:
+  .globl stoptime
+stoptime:
+  .globl f
+f:
+  .globl main
+main:
