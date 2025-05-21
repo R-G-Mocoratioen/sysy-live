@@ -368,7 +368,7 @@ impl ArrayInit {
                                 panic!("bad array initializer");
                             }
                             let respr = find_firstok(curpos, lens.clone());
-                            let firstok = respr.0;
+                            let firstok: i32 = std::cmp::max(respr.0, 1);
                             let curcur = respr.1;
                             // 用 inits 去匹配 firstok 之后的
                             let at = gen_arrayelem_ptr(

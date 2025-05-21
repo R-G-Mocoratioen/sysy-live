@@ -1,6 +1,6 @@
-int arr[65536];
+const int buf[3][3][1] = { 1,{},2 }; 
+const int buf2[2][3] = {{}, 1};
 
 int main() {
-  int arr[4096] = {1};
-  return arr[0];
+  return buf2[1][0];
 }

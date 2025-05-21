@@ -87,7 +87,7 @@ pub fn gen_globalarrayinit(
                             panic!("bad array initializer");
                         }
                         let respr = find_firstok(curpos, lens.clone());
-                        let firstok = respr.0;
+                        let firstok: i32 = std::cmp::max(respr.0, 1);
                         // 用 inits 去匹配 firstok 之后的
                         let newvec = gen_globalarrayinit(
                             data,
