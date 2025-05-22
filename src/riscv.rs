@@ -10,8 +10,8 @@ pub enum Position {
 }
 
 pub struct BasicBlockVal {
-    bb: BasicBlock,
-    insts: Vec<Value>,
+    pub bb: BasicBlock,
+    pub insts: Vec<Value>,
 }
 
 pub trait GenerateAsm {

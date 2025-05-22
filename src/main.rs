@@ -2,6 +2,7 @@ use crate::riscv::*;
 use koopa::back::KoopaGenerator;
 use koopa::ir::*;
 use lalrpop_util::lalrpop_mod;
+use optimize_loadstore::OptimizeLoadStore;
 use std::collections::HashMap;
 use std::env;
 use std::fs::read_to_string;
@@ -13,6 +14,7 @@ mod arrayinit;
 mod ast;
 mod constint;
 mod ident;
+mod optimize_loadstore;
 mod riscv;
 mod tokoopa;
 mod whilecontext;
@@ -28,6 +30,10 @@ fn main() -> Result<()> {
     let input = read_to_string(args[2].clone())?;
     let ast = sysy::CompUnitParser::new().parse(&input).unwrap();
     let mut program = ast.gen_ir();
+
+    // here comes the optimizations
+    program.optimize_loadstore();
+
     if args[1] == "-koopa" {
         let mut gen = KoopaGenerator::new(Vec::new());
         gen.generate_on(&program).unwrap();
