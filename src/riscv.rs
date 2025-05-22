@@ -5,6 +5,7 @@ use std::collections::HashMap;
 pub enum Position {
     Stack(i32),
     RegX(i32),
+    Global(String), // name and type
 }
 
 pub struct BasicBlockVal {
@@ -13,20 +14,95 @@ pub struct BasicBlockVal {
 }
 
 pub trait GenerateAsm {
-    fn to_riscv(&mut self) -> String;
+    fn to_riscv(
+        &mut self,
+        pos: &mut HashMap<Value, Position>,
+        funcname: &mut HashMap<Function, (String, bool)>,
+    ) -> String;
+}
+
+pub trait GenBlobalData {
+    fn gen_global_data(&mut self, ret: &mut String, val: Value);
+}
+
+impl GenBlobalData for Program {
+    fn gen_global_data(&mut self, ret: &mut String, val: Value) {
+        let valkind = self.borrow_value(val).kind().clone();
+        let valsize = self.borrow_value(val).ty().size() as i32;
+        match valkind {
+            ValueKind::Integer(intg) => {
+                ret.push_str(&format!("  .word {}\n", intg.value()));
+            }
+            ValueKind::ZeroInit(_) => {
+                ret.push_str(&format!("  .zero {}\n", valsize));
+            }
+            ValueKind::Aggregate(agg) => {
+                for nval in agg.elems() {
+                    self.gen_global_data(ret, nval.clone());
+                }
+            }
+            _ => panic!("bad init value for global variables"),
+        }
+    }
 }
 
 impl GenerateAsm for Program {
-    fn to_riscv(&mut self) -> String {
+    fn to_riscv(
+        &mut self,
+        pos: &mut HashMap<Value, Position>,
+        funcname: &mut HashMap<Function, (String, bool)>,
+    ) -> String {
         let mut ret = String::new();
-        ret.push_str("  .data\n");
-        ret.push_str("  .text\n");
+        let mut gblvals = Vec::new();
+        for &gblval in self.inst_layout() {
+            gblvals.push(gblval);
+        }
+
+        let mut curi = 0;
+        for gval in gblvals.iter() {
+            let valkind = self.borrow_value(gval.clone()).kind().clone();
+            // let valtype = self.borrow_value(gval.clone()).ty()
+            match valkind {
+                ValueKind::GlobalAlloc(alloc) => {
+                    let myname: String = "GLBVAL_".to_owned() + &curi.to_string();
+                    pos.insert(gval.clone(), Position::Global(myname.clone()));
+                    ret.push_str("  .data\n");
+                    ret.push_str("  .globl ");
+                    ret.push_str(&myname);
+                    ret.push_str("\n");
+                    ret.push_str(&myname);
+                    ret.push_str(":\n");
+                    let initval = alloc.init();
+                    self.gen_global_data(&mut ret, initval);
+
+                    ret.push_str("\n");
+                    curi += 1;
+                }
+                _ => {
+                    continue;
+                }
+            }
+        }
+
         let mut funclist: Vec<Function> = Vec::new();
         for &func in self.func_layout() {
             funclist.push(func);
         }
         for func in funclist.iter() {
-            ret.push_str(&self.func_mut(*func).to_riscv());
+            let myfunc = self.func_mut(*func);
+            match myfunc.ty().kind() {
+                types::TypeKind::Function(_, restype) => {
+                    funcname.insert(
+                        func.clone(),
+                        (myfunc.name().to_string(), !restype.is_unit()),
+                    );
+                }
+                _ => {}
+            }
+        }
+        for func in funclist.iter() {
+            ret.push_str(&self.func_mut(*func).to_riscv(pos, funcname));
+            ret.push_str("\n");
         }
         return ret;
     }
@@ -42,6 +118,49 @@ fn gen_lw_t_sp(ret: &mut String, id: i32, offset: i32) {
     }
 }
 
+fn gen_lw_x_sp(ret: &mut String, id: i32, offset: i32) {
+    if offset < 2048 {
+        ret.push_str(&format!("  lw x{}, {}(sp)\n", id, offset));
+    } else {
+        ret.push_str(&format!("  li x{}, {}\n", id, offset));
+        ret.push_str(&format!("  add x{}, sp, x{}\n", id, id));
+        ret.push_str(&format!("  lw x{}, 0(x{})\n", id, id));
+    }
+}
+
+fn makex(
+    dfg: &DataFlowGraph,
+    ret: &mut String,
+    pos: &HashMap<Value, Position>,
+    val: Value,
+    id: i32,
+) {
+    // 1. 判断是否是全局变量
+    let srcpos1 = pos.get(&val);
+    if let Some(Position::Global(name)) = srcpos1 {
+        ret.push_str(&format!("  la x{}, {}\n", id, name));
+        return;
+    }
+    // 2. 如果是局部变量，再看数（函数中不会用到全局的数的）
+    let vkind = dfg.value(val).kind().clone();
+    if let ValueKind::Integer(rval) = vkind {
+        ret.push_str(&format!("  li x{}, {}\n", id, rval.value()));
+        return;
+    }
+    let srcpos = srcpos1.unwrap();
+    match srcpos {
+        Position::Stack(offset) => {
+            gen_lw_x_sp(ret, id.clone(), offset.clone());
+        }
+        Position::RegX(reg) => {
+            ret.push_str(&format!("  mv x{}, x{}\n", id, reg));
+            return;
+        }
+        _ => {}
+    }
+    // ret.push_str(&format!("  lw x{}, 0(x{})\n", id, id));
+}
+
 fn maket(
     dfg: &DataFlowGraph,
     ret: &mut String,
@@ -49,21 +168,11 @@ fn maket(
     val: Value,
     id: i32,
 ) {
-    let vkind = dfg.value(val).kind().clone();
-    if let ValueKind::Integer(rval) = vkind {
-        ret.push_str(&format!("  li t{}, {}\n", id, rval.value()));
-        return;
+    if id < 3 {
+        makex(dfg, ret, pos, val, id + 5);
+    } else {
+        makex(dfg, ret, pos, val, id + 25);
     }
-    let srcpos = pos.get(&val).unwrap();
-    match srcpos {
-        Position::Stack(offset) => {
-            gen_lw_t_sp(ret, id.clone(), offset.clone());
-        }
-        Position::RegX(reg) => {
-            ret.push_str(&format!("  mv t{}, x{}\n", id, reg));
-        }
-    }
-    ret.push_str(&format!("  lw t{}, 0(t{})\n", id, id));
 }
 
 // might change the value of t1
@@ -78,8 +187,17 @@ fn store_t0_to_offset_using_t1(ret: &mut String, offset: i32) {
 }
 
 impl GenerateAsm for FunctionData {
-    fn to_riscv(&mut self) -> String {
+    fn to_riscv(
+        &mut self,
+        pos: &mut HashMap<Value, Position>,
+        funcname: &mut HashMap<Function, (String, bool)>,
+    ) -> String {
+        if self.layout_mut().bbs_mut().len() == 0 {
+            return String::new();
+        }
+
         let mut ret = String::new();
+        ret.push_str("  .text\n");
         ret.push_str("  .globl ");
         ret.push_str(&self.name()[1..]);
         ret.push_str("\n");
@@ -108,8 +226,7 @@ impl GenerateAsm for FunctionData {
         for blockval in bbs.iter() {
             for inst in blockval.insts.iter() {
                 let kind = self.dfg_mut().value(inst.clone()).kind().clone();
-                if let ValueKind::Load(_) = kind {
-                } else if let ValueKind::Store(_) = kind {
+                if let ValueKind::Store(_) = kind {
                 } else if let ValueKind::Jump(_) = kind {
                 } else if let ValueKind::Branch(_) = kind {
                 } else if let ValueKind::Return(_) = kind {
@@ -137,11 +254,15 @@ impl GenerateAsm for FunctionData {
         // 1. 算出 sp
         let all_size = (size_s + size_ra + size_a + 15) / 16 * 16;
         if all_size != 0 {
-            ret.push_str(&format!("addi sp, sp, -{}\n", all_size));
+            if all_size < 2048 {
+                ret.push_str(&format!("  addi sp, sp, -{}\n", all_size));
+            } else {
+                ret.push_str(&format!("  li t0, -{}\n", all_size));
+                ret.push_str(&format!("  add sp, sp, t0\n"));
+            }
         }
 
         // 2. 把函数参数放到合适的位置
-        let mut pos: HashMap<Value, Position> = HashMap::new();
         {
             let mut i = 0;
             for val0 in self.params() {
@@ -165,11 +286,11 @@ impl GenerateAsm for FunctionData {
         }
 
         // 3. 开始生成
-        let mut curat = size_a;
+        let mut curat = size_a + size_ra;
         for blockval in bbs.iter() {
             // let bb = blockval.bb.clone();
             ret.push_str(&self.name()[1..]);
-            ret.push_str(&format!("_{}:\n", bbids.get(&blockval.bb).unwrap()));
+            ret.push_str(&format!("_PLSDONT_{}:\n", bbids.get(&blockval.bb).unwrap()));
             for inst0 in blockval.insts.iter() {
                 let inst = inst0.clone();
                 let kind = self.dfg_mut().value(inst).kind().clone();
@@ -199,6 +320,7 @@ impl GenerateAsm for FunctionData {
                     ValueKind::Load(ld) => {
                         let src = ld.src();
                         maket(self.dfg(), &mut ret, &pos, src, 0);
+                        ret.push_str(&format!("  lw t0, 0(t0)\n"));
                         store_t0_to_offset_using_t1(&mut ret, curat);
                         pos.insert(inst, Position::Stack(curat));
                         curat += 4;
@@ -215,8 +337,8 @@ impl GenerateAsm for FunctionData {
                         let index = getptr.index();
                         maket(self.dfg(), &mut ret, &pos, src, 0);
                         maket(self.dfg(), &mut ret, &pos, index, 1);
-                        let ptrty = self.dfg_mut().value(inst.clone()).ty().clone();
                         let sz;
+                        let ptrty = self.dfg_mut().value(inst.clone()).ty().clone();
                         match ptrty.kind() {
                             types::TypeKind::Pointer(t) => {
                                 sz = t.size() as i32;
@@ -235,15 +357,12 @@ impl GenerateAsm for FunctionData {
                         let index = gel.index();
                         maket(self.dfg(), &mut ret, &pos, src, 0);
                         maket(self.dfg(), &mut ret, &pos, index, 1);
-                        let ptrty = self.dfg_mut().value(inst.clone()).ty().clone();
                         let sz;
+                        let ptrty = self.dfg_mut().value(inst.clone()).ty().clone();
                         match ptrty.kind() {
-                            types::TypeKind::Pointer(t) => match t.kind() {
-                                types::TypeKind::Array(t1, _) => {
-                                    sz = t1.size() as i32;
-                                }
-                                _ => unreachable!(),
-                            },
+                            types::TypeKind::Pointer(t) => {
+                                sz = t.size() as i32;
+                            }
                             _ => unreachable!(),
                         }
                         ret.push_str(&format!("  li t2, {}\n", sz));
@@ -258,7 +377,7 @@ impl GenerateAsm for FunctionData {
                         let id = bbids.get(&bb).unwrap();
                         ret.push_str(&format!("  j "));
                         ret.push_str(&self.name()[1..]);
-                        ret.push_str(&format!("_{}\n", id));
+                        ret.push_str(&format!("_PLSDONT_{}\n", id));
                     }
                     ValueKind::Branch(br) => {
                         let cond = br.cond();
@@ -267,41 +386,142 @@ impl GenerateAsm for FunctionData {
                         maket(self.dfg(), &mut ret, &pos, cond, 0);
                         ret.push_str(&format!("  beqz t0, "));
                         ret.push_str(&self.name()[1..]);
-                        ret.push_str(&format!("_{}\n", bbid));
+                        ret.push_str(&format!("_PLSDONT_{}\n", bbid));
 
                         ret.push_str(&format!("  j "));
                         ret.push_str(&self.name()[1..]);
-                        ret.push_str(&format!("_{}\n", bbids.get(&bbtrue).unwrap()));
+                        ret.push_str(&format!("_PLSDONT_{}\n", bbids.get(&bbtrue).unwrap()));
 
                         ret.push_str(&self.name()[1..]);
-                        ret.push_str(&format!("_{}:\n", bbid));
+                        ret.push_str(&format!("_PLSDONT_{}:\n", bbid));
                         bbid += 1;
                         ret.push_str(&format!("  j "));
                         ret.push_str(&self.name()[1..]);
-                        ret.push_str(&format!("_{}\n", bbids.get(&bbfalse).unwrap()));
+                        ret.push_str(&format!("_PLSDONT_{}\n", bbids.get(&bbfalse).unwrap()));
                     }
-                    ValueKind::Return(ret) => {
-                        let val = ret.value();
+                    ValueKind::Return(re) => {
+                        let val = re.value();
                         match val {
                             Some(v) => {
-                                maket(self.dfg(), &mut ret, &pos, v, 0);
-                                ret.push_str(&format!("  mv a0, t0\n"));
+                                makex(self.dfg(), &mut ret, &pos, v, 10);
+                                if all_size != 0 {
+                                    if all_size < 2048 {
+                                        ret.push_str(&format!("  addi sp, sp, {}\n", all_size));
+                                    } else {
+                                        ret.push_str(&format!("  li t0, {}\n", all_size));
+                                        ret.push_str(&format!("  add sp, sp, t0\n"));
+                                    }
+                                }
                                 ret.push_str(&format!("  ret\n"));
                             }
-                            _ => {}
+                            _ => {
+                                if all_size != 0 {
+                                    if all_size < 2048 {
+                                        ret.push_str(&format!("  addi sp, sp, {}\n", all_size));
+                                    } else {
+                                        ret.push_str(&format!("  li t0, {}\n", all_size));
+                                        ret.push_str(&format!("  add sp, sp, t0\n"));
+                                    }
+                                }
+                                ret.push_str(&format!("  ret\n"));
+                            }
                         }
                     }
-                    ValueKind::Call(call) => {}
-                    ValueKind::Binary(bin) => {}
+                    ValueKind::Binary(bin) => {
+                        let lhs = bin.lhs();
+                        let rhs = bin.rhs();
+                        maket(self.dfg(), &mut ret, &pos, lhs, 0);
+                        maket(self.dfg(), &mut ret, &pos, rhs, 1);
+                        match bin.op() {
+                            BinaryOp::NotEq => {
+                                ret.push_str(&format!("  sub t1, t0, t1\n"));
+                                ret.push_str(&format!("  snez t0, t1\n"));
+                            }
+                            BinaryOp::Eq => {
+                                ret.push_str(&format!("  sub t1, t0, t1\n"));
+                                ret.push_str(&format!("  seqz t0, t1\n"));
+                            }
+                            BinaryOp::Gt => {
+                                ret.push_str(&format!("  sgt t0, t0, t1\n"));
+                            }
+                            BinaryOp::Lt => {
+                                ret.push_str(&format!("  slt t0, t0, t1\n"));
+                            }
+                            BinaryOp::Ge => {
+                                ret.push_str(&format!("  slt t0, t1, t0\n"));
+                            }
+                            BinaryOp::Le => {
+                                ret.push_str(&format!("  sgt t0, t1, t0\n"));
+                            }
+                            BinaryOp::Add => {
+                                ret.push_str(&format!("  add t0, t0, t1\n"));
+                            }
+                            BinaryOp::Sub => {
+                                ret.push_str(&format!("  sub t0, t0, t1\n"));
+                            }
+                            BinaryOp::Mul => {
+                                ret.push_str(&format!("  mul t0, t0, t1\n"));
+                            }
+                            BinaryOp::Div => {
+                                ret.push_str(&format!("  div t0, t0, t1\n"));
+                            }
+                            BinaryOp::Mod => {
+                                ret.push_str(&format!("  rem t0, t0, t1\n"));
+                            }
+                            // bitwise and or xor
+                            BinaryOp::And => {
+                                ret.push_str(&format!("  and t0, t0, t1\n"));
+                            }
+                            BinaryOp::Or => {
+                                ret.push_str(&format!("  or t0, t0, t1\n"));
+                            }
+                            BinaryOp::Xor => {
+                                ret.push_str(&format!("  xor t0, t0, t1\n"));
+                            }
+                            _ => {
+                                panic!("not implemented")
+                            }
+                        }
+                        store_t0_to_offset_using_t1(&mut ret, curat);
+                        pos.insert(inst, Position::Stack(curat));
+                        curat += 4;
+                    }
+                    ValueKind::Call(call) => {
+                        let mut i = 0;
+                        for arg in call.args() {
+                            if i < 8 {
+                                makex(self.dfg(), &mut ret, &pos, arg.clone(), 10 + i);
+                            } else {
+                                maket(self.dfg(), &mut ret, &pos, arg.clone(), 0);
+                                store_t0_to_offset_using_t1(&mut ret, 4 * (i - 8));
+                            }
+                            i += 1;
+                        }
+                        ret.push_str(&format!("  mv t0, ra\n"));
+                        store_t0_to_offset_using_t1(&mut ret, size_a);
+
+                        let funcdata = funcname.get(&call.callee()).unwrap();
+
+                        ret.push_str(&format!("  call "));
+                        ret.push_str(&funcdata.0[1..]);
+                        ret.push_str("\n");
+
+                        gen_lw_t_sp(&mut ret, 0, size_a);
+                        ret.push_str(&format!("  mv ra, t0\n")); // reload ra
+
+                        if funcdata.1 {
+                            ret.push_str(&format!("  mv t0, a0\n"));
+                            store_t0_to_offset_using_t1(&mut ret, curat);
+                            pos.insert(inst, Position::Stack(curat));
+                            curat += 4;
+                        }
+                    }
                     _ => {
                         panic!("bad value for instruction");
                     }
                 }
             }
             bbid += 1;
-        }
-        if all_size != 0 {
-            ret.push_str(&format!("addi sp, sp, {}\n", all_size));
         }
         return ret;
     }

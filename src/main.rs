@@ -1,7 +1,8 @@
-use crate::riscv::GenerateAsm;
+use crate::riscv::*;
 use koopa::back::KoopaGenerator;
 use koopa::ir::*;
 use lalrpop_util::lalrpop_mod;
+use std::collections::HashMap;
 use std::env;
 use std::fs::read_to_string;
 use std::io::Result;
@@ -34,7 +35,9 @@ fn main() -> Result<()> {
         std::fs::write(args[4].clone(), text_from_ir)?;
     }
     if args[1] == "-riscv" || args[1] == "-perf" {
-        let str = program.to_riscv();
+        let mut m1: HashMap<Value, Position> = HashMap::new();
+        let mut m2: HashMap<Function, (String, bool)> = HashMap::new();
+        let str = program.to_riscv(&mut m1, &mut m2);
         std::fs::write(args[4].clone(), str)?;
     }
     Ok(())

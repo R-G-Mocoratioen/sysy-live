@@ -1,24 +1,122 @@
-  .data
-  .text
-  .globl __pseudo__please_dont_give_same_name
-__pseudo__please_dont_give_same_name:
-  .globl getint
-getint:
-  .globl getch
-getch:
-  .globl getarray
-getarray:
-  .globl putint
-putint:
-  .globl putch
-putch:
-  .globl putarray
-putarray:
-  .globl starttime
-starttime:
-  .globl stoptime
-stoptime:
-  .globl f
-f:
-  .globl main
-main:
+global %0 = alloc i32, 0
+
+fun @__pseudo__please_dont_give_same_name() {
+%1:
+  ret
+}
+
+decl @getint(): i32
+
+decl @getch(): i32
+
+decl @getarray(*i32): i32
+
+decl @putint(i32)
+
+decl @putch(i32)
+
+decl @putarray(i32, *i32)
+
+decl @starttime()
+
+decl @stoptime()
+
+fun @init1d(%2: i32, %3: *i32) {
+%4:
+  %5 = alloc i32
+  store %2, %5
+  %6 = alloc i32
+  store 0, %6
+  jump %7
+
+%7:
+  %8 = load %6
+  %9 = load %5
+  %10 = lt %8, %9
+  br %10, %11, %12
+
+%11:
+  %13 = load %6
+  %14 = getptr %3, %13
+  %15 = load %0
+  store %15, %14
+  %16 = load %0
+  %17 = add %16, 1
+  store %17, %0
+  %18 = load %6
+  %19 = add %18, 1
+  store %19, %6
+  jump %7
+
+%12:
+  ret
+}
+
+fun @init2d(%20: i32, %21: *[i32, 10]) {
+%22:
+  %23 = alloc i32
+  store %20, %23
+  %24 = alloc i32
+  store 0, %24
+  jump %25
+
+%25:
+  %26 = load %24
+  %27 = load %23
+  %28 = lt %26, %27
+  br %28, %29, %30
+
+%29:
+  %31 = load %24
+  %32 = getptr %21, %31
+  %33 = getelemptr %32, 0
+  call @init1d(10, %33)
+  %34 = load %24
+  %35 = add %34, 1
+  store %35, %24
+  jump %25
+
+%30:
+  ret
+}
+
+fun @init3d(%36: i32, %37: *[[i32, 10], 10]) {
+%38:
+  %39 = alloc i32
+  store %36, %39
+  %40 = alloc i32
+  store 0, %40
+  jump %41
+
+%41:
+  %42 = load %40
+  %43 = load %39
+  %44 = lt %42, %43
+  br %44, %45, %46
+
+%45:
+  %47 = load %40
+  %48 = getptr %37, %47
+  %49 = getelemptr %48, 0
+  call @init2d(10, %49)
+  %50 = load %40
+  %51 = add %50, 1
+  store %51, %40
+  jump %41
+
+%46:
+  ret
+}
+
+fun @main(): i32 {
+%52:
+  %53 = alloc [[[i32, 10], 10], 10]
+  %54 = getelemptr %53, 0
+  call @init3d(10, %54)
+  %55 = load %0
+  call @putint(%55)
+  ret 0
+
+%56:
+  ret 0
+}
