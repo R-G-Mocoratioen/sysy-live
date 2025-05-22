@@ -2,6 +2,7 @@ use koopa::ir::dfg::*;
 use koopa::ir::*;
 use std::collections::HashMap;
 
+#[derive(Clone)]
 pub enum Position {
     Stack(i32),
     RegX(i32),
@@ -101,13 +102,15 @@ impl GenerateAsm for Program {
             }
         }
         for func in funclist.iter() {
-            ret.push_str(&self.func_mut(*func).to_riscv(pos, funcname));
+            let mut newpos = pos.clone();
+            ret.push_str(&self.func_mut(*func).to_riscv(&mut newpos, funcname));
             ret.push_str("\n");
         }
         return ret;
     }
 }
 
+/// 让 t\[id] = M\[sp + offset]，且只会改变 t\[id] 的值
 fn gen_lw_t_sp(ret: &mut String, id: i32, offset: i32) {
     if offset < 2048 {
         ret.push_str(&format!("  lw t{}, {}(sp)\n", id, offset));
@@ -118,6 +121,7 @@ fn gen_lw_t_sp(ret: &mut String, id: i32, offset: i32) {
     }
 }
 
+/// 让 x\[id] = M\[sp + offset]，且只会改变 x\[id] 的值
 fn gen_lw_x_sp(ret: &mut String, id: i32, offset: i32) {
     if offset < 2048 {
         ret.push_str(&format!("  lw x{}, {}(sp)\n", id, offset));
@@ -175,7 +179,7 @@ fn maket(
     }
 }
 
-// might change the value of t1
+/// 让 M\[sp + offset] = t0，会改变 t0, t1
 fn store_t0_to_offset_using_t1(ret: &mut String, offset: i32) {
     if offset < 2048 {
         ret.push_str(&format!("  sw t0, {}(sp)\n", offset));
@@ -449,9 +453,11 @@ impl GenerateAsm for FunctionData {
                             }
                             BinaryOp::Ge => {
                                 ret.push_str(&format!("  slt t0, t1, t0\n"));
+                                ret.push_str(&format!("  xori t0, t0, 1\n"));
                             }
                             BinaryOp::Le => {
                                 ret.push_str(&format!("  sgt t0, t1, t0\n"));
+                                ret.push_str(&format!("  xori t0, t0, 1\n"));
                             }
                             BinaryOp::Add => {
                                 ret.push_str(&format!("  add t0, t0, t1\n"));
@@ -521,7 +527,6 @@ impl GenerateAsm for FunctionData {
                     }
                 }
             }
-            bbid += 1;
         }
         return ret;
     }

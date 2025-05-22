@@ -1,7 +1,5 @@
-global %0 = alloc [[i32, 100], 2], zeroinit
-
 fun @__pseudo__please_dont_give_same_name() {
-%1:
+%0:
   ret
 }
 
@@ -21,208 +19,35 @@ decl @starttime()
 
 decl @stoptime()
 
-fun @merge_sort(%2: i32, %3: i32) {
-%4:
-  %5 = alloc i32
-  store %2, %5
-  %6 = alloc i32
-  store %3, %6
-  %7 = load %5
-  %8 = add %7, 1
-  %9 = load %6
-  %10 = ge %8, %9
-  br %10, %11, %12
-
-%11:
-  ret
-
-%12:
-  %13 = alloc i32
-  %14 = load %5
-  %15 = load %6
-  %16 = add %14, %15
-  %17 = div %16, 2
-  store %17, %13
-  %18 = load %5
-  %19 = load %13
-  call @merge_sort(%18, %19)
-  %20 = load %13
-  %21 = load %6
-  call @merge_sort(%20, %21)
-  %22 = alloc i32
-  %23 = load %5
-  store %23, %22
-  %24 = alloc i32
-  %25 = load %13
-  store %25, %24
-  %26 = alloc i32
-  %27 = load %5
-  store %27, %26
-  jump %28
-
-%29:
-  jump %12
-
-%28:
-  %30 = load %22
-  %31 = load %13
-  %32 = lt %30, %31
-  %33 = alloc i32
-  store 0, %33
-  br %32, %34, %35
-
-%36:
-  %37 = getelemptr %0, 0
-  %38 = load %22
-  %39 = getelemptr %37, %38
-  %40 = load %39
-  %41 = getelemptr %0, 0
-  %42 = load %24
-  %43 = getelemptr %41, %42
-  %44 = load %43
-  %45 = lt %40, %44
-  br %45, %46, %47
-
-%48:
-  jump %49
-
-%34:
-  %50 = load %24
-  %51 = load %6
-  %52 = lt %50, %51
-  %53 = ne %52, 0
-  store %53, %33
-  jump %35
-
-%35:
-  %54 = load %33
-  br %54, %36, %48
-
-%46:
-  %55 = getelemptr %0, 1
-  %56 = load %26
-  %57 = getelemptr %55, %56
-  %58 = getelemptr %0, 0
-  %59 = load %22
-  %60 = getelemptr %58, %59
-  %61 = load %60
-  store %61, %57
-  %62 = load %22
-  %63 = add %62, 1
-  store %63, %22
-  jump %64
-
-%47:
-  %65 = getelemptr %0, 1
-  %66 = load %26
-  %67 = getelemptr %65, %66
-  %68 = getelemptr %0, 0
-  %69 = load %24
-  %70 = getelemptr %68, %69
-  %71 = load %70
-  store %71, %67
-  %72 = load %24
-  %73 = add %72, 1
-  store %73, %24
-  jump %64
-
-%64:
-  %74 = load %26
-  %75 = add %74, 1
-  store %75, %26
-  jump %28
-
-%49:
-  %76 = load %22
-  %77 = load %13
-  %78 = lt %76, %77
-  br %78, %79, %80
-
-%79:
-  %81 = getelemptr %0, 1
-  %82 = load %26
-  %83 = getelemptr %81, %82
-  %84 = getelemptr %0, 0
-  %85 = load %22
-  %86 = getelemptr %84, %85
-  %87 = load %86
-  store %87, %83
-  %88 = load %22
-  %89 = add %88, 1
-  store %89, %22
-  %90 = load %26
-  %91 = add %90, 1
-  store %91, %26
-  jump %49
-
-%80:
-  jump %92
-
-%92:
-  %93 = load %24
-  %94 = load %6
-  %95 = lt %93, %94
-  br %95, %96, %97
-
-%96:
-  %98 = getelemptr %0, 1
-  %99 = load %26
-  %100 = getelemptr %98, %99
-  %101 = getelemptr %0, 0
-  %102 = load %24
-  %103 = getelemptr %101, %102
-  %104 = load %103
-  store %104, %100
-  %105 = load %24
-  %106 = add %105, 1
-  store %106, %24
-  %107 = load %26
-  %108 = add %107, 1
-  store %108, %26
-  jump %92
-
-%97:
-  jump %109
-
-%109:
-  %110 = load %5
-  %111 = load %6
-  %112 = lt %110, %111
-  br %112, %113, %114
-
-%113:
-  %115 = getelemptr %0, 0
-  %116 = load %5
-  %117 = getelemptr %115, %116
-  %118 = getelemptr %0, 1
-  %119 = load %5
-  %120 = getelemptr %118, %119
-  %121 = load %120
-  store %121, %117
-  %122 = load %5
-  %123 = add %122, 1
-  store %123, %5
-  jump %109
-
-%114:
-  ret
-}
-
 fun @main(): i32 {
-%124:
-  %125 = alloc i32
-  %126 = getelemptr %0, 0
-  %127 = getelemptr %126, 0
-  %128 = call @getarray(%127)
-  store %128, %125
-  %129 = load %125
-  call @merge_sort(0, %129)
-  %130 = load %125
-  %131 = getelemptr %0, 0
-  %132 = getelemptr %131, 0
-  call @putarray(%130, %132)
+%1:
+  %2 = alloc i32
+  store 100, %2
+  %3 = alloc i32
+  store 100, %3
+  %4 = alloc i32
+  %5 = load %2
+  %6 = load %3
+  %7 = le %5, %6
+  %8 = alloc i32
+  store 1, %8
+  br %7, %9, %10
+
+%10:
+  %11 = load %3
+  %12 = load %2
+  %13 = ge %11, %12
+  %14 = ne %13, 0
+  store %14, %8
+  jump %9
+
+%9:
+  %15 = load %8
+  store %15, %4
+  %16 = load %4
+  call @putint(%16)
   ret 0
 
-%133:
+%17:
   ret 0
 }
