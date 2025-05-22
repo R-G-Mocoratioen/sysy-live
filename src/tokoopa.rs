@@ -290,35 +290,23 @@ impl FuncDef {
 
         let mut id = 0;
         for param in self.params.iter() {
+            let funcparamval = main_data.params()[id];
+            let paramtyp = main_data.dfg().value(funcparamval).ty().clone();
+            let alloc = main_data.dfg_mut().new_value().alloc(paramtyp);
+            let store = main_data.dfg_mut().new_value().store(funcparamval, alloc);
+            main_data
+                .layout_mut()
+                .bb_mut(entry)
+                .insts_mut()
+                .extend([alloc, store]);
             match param {
                 FuncParam::Var(paramid) => {
-                    let alloc = main_data.dfg_mut().new_value().alloc(Type::get_i32());
-                    let funcparamval = main_data.params()[id];
-                    let load = main_data.dfg_mut().new_value().store(funcparamval, alloc);
-                    main_data
-                        .layout_mut()
-                        .bb_mut(entry)
-                        .insts_mut()
-                        .extend([alloc, load]);
                     myvar.insert(paramid.clone(), IdentValue::Value(alloc));
                 }
                 FuncParam::Array(paramid, exps) => {
-                    /*let mut lens: Vec<i32> = Vec::new();
-                    for exp in exps.iter() {
-                        let val = exp.gen_ir(main_data, &mut entry, var);
-                        if let Some(rv) = get_const_int(main_data, val) {
-                            lens.push(rv);
-                        } else {
-                            panic!(
-                                "array size of array {} in funcdef is not a constant",
-                                paramid
-                            );
-                        }
-                    }*/
-                    let funcparamval = main_data.params()[id];
                     myvar.insert(
                         paramid.clone(),
-                        IdentValue::FuncArgumentArray(funcparamval, exps.len() as i32 + 1),
+                        IdentValue::FuncArgumentArray(alloc, exps.len() as i32 + 1),
                     );
                 }
             }
@@ -697,7 +685,9 @@ impl LVal {
                                 panic!("Array {} used as left value", id);
                             }
                             // 这里的 val 就是和 func 的 val 一样的传法
-                            return val;
+                            let load = data.dfg_mut().new_value().load(val);
+                            data.layout_mut().bb_mut(*entry).insts_mut().extend([load]);
+                            return load;
                         }
                         IdentValue::Array(val, _) => {
                             if !needload {
@@ -722,8 +712,10 @@ impl LVal {
                     match val {
                         IdentValue::Func(_) => panic!("Function {} used as array", id),
                         IdentValue::Value(_) => panic!("Variable {} used as array", id),
-                        IdentValue::FuncArgumentArray(val, dim) => {
-                            let mut ptrval = val;
+                        IdentValue::FuncArgumentArray(val0, dim) => {
+                            let load0 = data.dfg_mut().new_value().load(val0);
+                            data.layout_mut().bb_mut(*entry).insts_mut().extend([load0]);
+                            let mut ptrval = load0;
                             let mut fir = true;
                             for exp in exps.iter() {
                                 let expval = exp.gen_ir(data, entry, var);

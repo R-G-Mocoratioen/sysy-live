@@ -1,66 +1,47 @@
-int init = 0;
+int buf[2][100];
 
-void init1d(int n, int arr[]) {
-  int i = 0;
-  while (i < n) {
-    arr[i] = init;
-    init = init + 1;
-    i = i + 1;
-  }
+// sort [l, r)
+void merge_sort(int l, int r)
+{
+    if (l + 1 >= r)
+        return;
+
+    int mid = (l + r) / 2;
+    merge_sort(l, mid);
+    merge_sort(mid, r);
+
+    int i = l, j = mid, k = l;
+    while (i < mid && j < r) {
+        if (buf[0][i] < buf[0][j]) {
+            buf[1][k] = buf[0][i];
+            i = i + 1;
+        } else {
+            buf[1][k] = buf[0][j];
+            j = j + 1;
+        }
+        k = k + 1;
+    }
+    while (i < mid) {
+        buf[1][k] = buf[0][i];
+        i = i + 1;
+        k = k + 1;
+    }
+    while (j < r) {
+        buf[1][k] = buf[0][j];
+        j = j + 1;
+        k = k + 1;
+    }
+
+    while (l < r) {
+        buf[0][l] = buf[1][l];
+        l = l + 1;
+    }
 }
 
-void init2d(int n, int arr[][10]) {
-  int i = 0;
-  while (i < n) {
-    init1d(10, arr[i]);
-    i = i + 1;
-  }
-}
-
-void init3d(int n, int arr[][10][10]) {
-  int i = 0;
-  while (i < n) {
-    init2d(10, arr[i]);
-    i = i + 1;
-  }
-}
-
-/*int sum1d(int n, int arr[]) {
-  int i = 0, sum = 0;
-  while (i < n) {
-    sum = sum + arr[i];
-    i = i + 1;
-  }
-  return sum;
-}
-
-int sum2d(int n, int arr[][10]) {
-  int i = 0, sum = 0;
-  while (i < n) {
-    sum = sum + sum1d(10, arr[i]);
-    i = i + 1;
-  }
-  return sum;
-}
-
-int sum3d(int n, int arr[][10][10]) {
-  int i = 0, sum = 0;
-  while (i < n) {
-    sum = sum + sum2d(10, arr[i]);
-    i = i + 1;
-  }
-  return sum;
-}*/
-
-int main() {
-  int arr[10][10][10];
-  // init2d(10, arr[0]);
-  init3d(10, arr);
-  //int sum = sum3d(10, arr);
-  //sum = sum + sum2d(10, arr[1]);
-  //sum = sum + sum1d(10, arr[2][3]);
-  //putint(sum);
-  //putch(10);
-  putint(init);
-  return 0;
+int main()
+{
+    int n = getarray(buf[0]);
+    merge_sort(0, n);
+    putarray(n, buf[0]);
+    return 0;
 }
