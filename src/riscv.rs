@@ -452,11 +452,11 @@ impl GenerateAsm for FunctionData {
                                 ret.push_str(&format!("  slt t0, t0, t1\n"));
                             }
                             BinaryOp::Ge => {
-                                ret.push_str(&format!("  slt t0, t1, t0\n"));
+                                ret.push_str(&format!("  slt t0, t0, t1\n"));
                                 ret.push_str(&format!("  xori t0, t0, 1\n"));
                             }
                             BinaryOp::Le => {
-                                ret.push_str(&format!("  sgt t0, t1, t0\n"));
+                                ret.push_str(&format!("  sgt t0, t0, t1\n"));
                                 ret.push_str(&format!("  xori t0, t0, 1\n"));
                             }
                             BinaryOp::Add => {
