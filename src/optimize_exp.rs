@@ -2,26 +2,26 @@ use crate::riscv::*;
 use koopa::ir::builder::*;
 use koopa::ir::*;
 use std::collections::HashMap;
-pub trait OptimizeLoadStore {
-    fn optimize_loadstore(&mut self);
+pub trait OptimizeExp {
+    fn optimize_exp(&mut self);
 }
 
-impl OptimizeLoadStore for Program {
-    fn optimize_loadstore(&mut self) {
+impl OptimizeExp for Program {
+    fn optimize_exp(&mut self) {
         let mut funclist: Vec<Function> = Vec::new();
         for &func in self.func_layout() {
             funclist.push(func);
         }
         for func in funclist.iter() {
-            self.func_mut(*func).optimize_loadstore();
+            self.func_mut(*func).optimize_exp();
         }
     }
 }
 
 // TODO: 1. 可达定值分析；2. 特判不能把函数的参数直接用。
 
-impl OptimizeLoadStore for FunctionData {
-    fn optimize_loadstore(&mut self) {
+impl OptimizeExp for FunctionData {
+    fn optimize_exp(&mut self) {
         let mut bbids: Vec<BasicBlock> = Vec::new();
         let mut bbs: Vec<BasicBlockVal> = Vec::new();
         let mut paramlist: HashMap<Value, bool> = HashMap::new();
