@@ -1,4 +1,4 @@
-use crate::riscv::*;
+// use crate::optimize_exp::OptimizeExp;
 use koopa::back::KoopaGenerator;
 use koopa::ir::*;
 use lalrpop_util::lalrpop_mod;
@@ -14,10 +14,12 @@ mod arrayinit;
 mod ast;
 mod constint;
 mod ident;
+// mod optimize_exp;
 mod optimize_loadstore;
 mod riscv;
 mod tokoopa;
 mod whilecontext;
+mod x86_32;
 
 fn main() -> Result<()> {
     Type::set_ptr_size(4);
@@ -32,6 +34,12 @@ fn main() -> Result<()> {
     let mut program = ast.gen_ir();
 
     // here comes the optimizations
+    // loop {
+    //     let res = program.optimize_exp();
+    //     if res == false {
+    //         break;
+    //     }
+    // }
     program.optimize_loadstore();
 
     if args[1] == "-koopa" {
@@ -41,9 +49,17 @@ fn main() -> Result<()> {
         std::fs::write(args[4].clone(), text_from_ir)?;
     }
     if args[1] == "-riscv" || args[1] == "-perf" {
+        use crate::riscv::*;
         let mut m1: HashMap<Value, Position> = HashMap::new();
         let mut m2: HashMap<Function, (String, bool)> = HashMap::new();
         let str = program.to_riscv(&mut m1, &mut m2);
+        std::fs::write(args[4].clone(), str)?;
+    }
+    if args[1] == "-x86_32" {
+        use crate::x86_32::*;
+        let mut m1: HashMap<Value, Position> = HashMap::new();
+        let mut m2: HashMap<Function, (String, bool)> = HashMap::new();
+        let str = program.to_x86_32(&mut m1, &mut m2);
         std::fs::write(args[4].clone(), str)?;
     }
     Ok(())
