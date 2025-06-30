@@ -27,47 +27,25 @@ main:                                   # @main
 # %bb.0:                                # %"$1"
 	pushq	%rbp
 	.seh_pushreg %rbp
-	pushq	%r14
-	.seh_pushreg %r14
 	pushq	%rsi
 	.seh_pushreg %rsi
 	pushq	%rdi
 	.seh_pushreg %rdi
-	pushq	%rbx
-	.seh_pushreg %rbx
-	subq	$144, %rsp
-	.seh_stackalloc 144
-	leaq	128(%rsp), %rbp
-	.seh_setframe %rbp, 128
+	subq	$96, %rsp
+	.seh_stackalloc 96
+	leaq	96(%rsp), %rbp
+	.seh_setframe %rbp, 96
 	.seh_endprologue
+	subq	$32, %rsp
 	callq	__main
-	movl	$24, %ecx
-	movl	$2, %edx
-	movl	$1, %r8d
-	callq	newnote
-	movl	%eax, %r14d
-	movl	%eax, 4(%rbp)
-	callq	newbar
-	movl	%eax, %esi
-	movl	$16, %ecx
-	movl	$1, %edx
-	movl	$1, %r8d
-	callq	newnote
-	movl	%esi, %ecx
-	movl	%eax, %edx
-	callq	bar_push
-	movl	$19, %ecx
-	movl	$1, %edx
-	movl	$1, %r8d
-	callq	newnote
-	movl	%esi, %ecx
-	movl	%eax, %edx
-	callq	bar_push
-	movl	%esi, 8(%rbp)
 	callq	newscore
-	movl	%eax, %ebx
+	addq	$32, %rsp
+	movl	%eax, %esi
+	subq	$32, %rsp
 	callq	newbar
+	addq	$32, %rsp
 	movl	%eax, %edi
+	subq	$32, %rsp
 	movl	$12, %ecx
 	movl	$1, %edx
 	movl	$1, %r8d
@@ -103,11 +81,13 @@ main:                                   # @main
 	movl	%edi, %ecx
 	movl	%eax, %edx
 	callq	bar_push
-	movl	%ebx, %ecx
+	movl	%esi, %ecx
 	movl	%edi, %edx
 	callq	score_push
 	callq	newbar
+	addq	$32, %rsp
 	movl	%eax, %edi
+	subq	$32, %rsp
 	movl	$16, %ecx
 	movl	$1, %edx
 	movl	$1, %r8d
@@ -129,175 +109,171 @@ main:                                   # @main
 	movl	%edi, %ecx
 	movl	%eax, %edx
 	callq	bar_push
-	movl	$1, %ecx
-	movl	$1, %edx
-	movl	$1, %r8d
-	callq	newnote_rest
-	movl	%edi, %ecx
-	movl	%eax, %edx
-	callq	bar_push
-	movl	%ebx, %ecx
-	movl	%edi, %edx
-	callq	score_push
-	callq	newbar
-	movl	%eax, %edi
-	movl	$17, %ecx
-	movl	$1, %edx
-	movl	$1, %r8d
-	callq	newnote
-	movl	%edi, %ecx
-	movl	%eax, %edx
-	callq	bar_push
-	movl	$17, %ecx
-	movl	$1, %edx
-	movl	$1, %r8d
-	callq	newnote
-	movl	%edi, %ecx
-	movl	%eax, %edx
-	callq	bar_push
-	movl	$16, %ecx
-	movl	$1, %edx
-	movl	$1, %r8d
-	callq	newnote
-	movl	%edi, %ecx
-	movl	%eax, %edx
-	callq	bar_push
-	movl	$17, %ecx
-	movl	$1, %edx
-	movl	$1, %r8d
-	callq	newnote
-	movl	%edi, %ecx
-	movl	%eax, %edx
-	callq	bar_push
-	movl	%ebx, %ecx
-	movl	%edi, %edx
-	callq	score_push
-	callq	newbar
-	movl	%eax, %edi
-	movl	$19, %ecx
+	movl	$12, %ecx
 	movl	$1, %edx
 	movl	$2, %r8d
 	callq	newnote
 	movl	%edi, %ecx
 	movl	%eax, %edx
 	callq	bar_push
-	movl	$2, %ecx
-	movl	$1, %edx
-	movl	$4, %r8d
-	callq	newnote_rest
-	movl	%edi, %ecx
-	movl	%eax, %edx
-	callq	bar_push
-	movl	$21, %ecx
-	movl	$1, %edx
-	movl	$4, %r8d
-	callq	newnote
-	movl	%edi, %ecx
-	movl	%eax, %edx
-	callq	bar_push
-	movl	$19, %ecx
+	movl	$11, %ecx
 	movl	$1, %edx
 	movl	$2, %r8d
 	callq	newnote
 	movl	%edi, %ecx
 	movl	%eax, %edx
 	callq	bar_push
-	movl	$17, %ecx
-	movl	$1, %edx
-	movl	$2, %r8d
-	callq	newnote
-	movl	%edi, %ecx
-	movl	%eax, %edx
-	callq	bar_push
-	movl	$19, %ecx
-	movl	$1, %edx
-	movl	$1, %r8d
-	callq	newnote
-	movl	%edi, %ecx
-	movl	%eax, %edx
-	callq	bar_push
-	movl	$16, %ecx
-	movl	$1, %edx
-	movl	$1, %r8d
-	callq	newnote
-	movl	%edi, %ecx
-	movl	%eax, %edx
-	callq	bar_push
-	movl	%ebx, %ecx
-	movl	%edi, %edx
-	callq	score_push
-	callq	newbar
-	movl	%eax, %edi
-	movl	$21, %ecx
-	movl	$1, %edx
-	movl	$1, %r8d
-	callq	newnote
-	movl	%edi, %ecx
-	movl	%eax, %edx
-	callq	bar_push
-	movl	$17, %ecx
-	movl	$1, %edx
-	movl	$1, %r8d
-	callq	newnote
-	movl	%edi, %ecx
-	movl	%eax, %edx
-	callq	bar_push
-	movl	$23, %ecx
-	movl	$1, %edx
-	movl	$1, %r8d
-	callq	newnote
-	movl	%edi, %ecx
-	movl	%eax, %edx
-	callq	bar_push
-	movl	$20, %ecx
-	movl	$1, %edx
-	movl	$1, %r8d
-	callq	newnote
-	movl	%edi, %ecx
-	movl	%eax, %edx
-	callq	bar_push
-	movl	%ebx, %ecx
-	movl	%edi, %edx
-	callq	score_push
-	movl	%ebx, 12(%rbp)
-	movabsq	$197568495665, %rax             # imm = 0x2E00000031
-	movq	%rax, -76(%rbp)
-	movabsq	$416611827831, %rax             # imm = 0x6100000077
-	movq	%rax, -68(%rbp)
-	movq	$118, -60(%rbp)
-	movq	$0, -52(%rbp)
-	movq	$0, -44(%rbp)
-	movabsq	$197568495666, %rcx             # imm = 0x2E00000032
-	movq	%rcx, -36(%rbp)
-	movq	%rax, -28(%rbp)
-	movq	$118, -20(%rbp)
-	movq	$0, -12(%rbp)
-	movq	$0, -4(%rbp)
 	movl	%esi, %ecx
-	movl	%r14d, %edx
+	movl	%edi, %edx
+	callq	score_push
+	callq	newbar
+	addq	$32, %rsp
+	movl	%eax, %edi
+	subq	$32, %rsp
+	movl	$9, %ecx
+	movl	$1, %edx
+	movl	$2, %r8d
+	callq	newnote
+	movl	%edi, %ecx
+	movl	%eax, %edx
 	callq	bar_push
-	movl	%ebx, %ecx
-	movl	$150, %edx
-	callq	score_setbpm
+	movl	$12, %ecx
+	movl	$1, %edx
+	movl	$2, %r8d
+	callq	newnote
+	movl	%edi, %ecx
+	movl	%eax, %edx
+	callq	bar_push
+	movl	$11, %ecx
+	movl	$1, %edx
+	movl	$2, %r8d
+	callq	newnote
+	movl	%edi, %ecx
+	movl	%eax, %edx
+	callq	bar_push
+	movl	$9, %ecx
+	movl	$1, %edx
+	movl	$2, %r8d
+	callq	newnote
+	movl	%edi, %ecx
+	movl	%eax, %edx
+	callq	bar_push
+	movl	$8, %ecx
+	movl	$1, %edx
+	movl	$2, %r8d
+	callq	newnote
+	movl	%edi, %ecx
+	movl	%eax, %edx
+	callq	bar_push
+	movl	$9, %ecx
+	movl	$1, %edx
+	movl	$2, %r8d
+	callq	newnote
+	movl	%edi, %ecx
+	movl	%eax, %edx
+	callq	bar_push
+	movl	$4, %ecx
+	movl	$1, %edx
+	movl	$2, %r8d
+	callq	newnote
+	movl	%edi, %ecx
+	movl	%eax, %edx
+	callq	bar_push
+	movl	$7, %ecx
+	movl	$1, %edx
+	movl	$2, %r8d
+	callq	newnote
+	movl	%edi, %ecx
+	movl	%eax, %edx
+	callq	bar_push
 	movl	%esi, %ecx
-	movl	$210, %edx
-	callq	bar_setbpm
-	movl	%ebx, %ecx
+	movl	%edi, %edx
+	callq	score_push
+	addq	$32, %rsp
+	movl	%esi, -8(%rbp)
+	subq	$32, %rsp
+	callq	newscore
+	addq	$32, %rsp
+	movl	%eax, %edi
+	subq	$32, %rsp
+	movl	%eax, %ecx
 	movl	%esi, %edx
-	callq	score_push
+	callq	score_copy
+	addq	$32, %rsp
+	movl	%edi, -12(%rbp)
+	movabsq	$197568495665, %rax             # imm = 0x2E00000031
+	movq	%rax, -92(%rbp)
+	movabsq	$416611827831, %rax             # imm = 0x6100000077
+	movq	%rax, -84(%rbp)
+	movq	$118, -76(%rbp)
+	movq	$0, -68(%rbp)
+	movq	$0, -60(%rbp)
+	movabsq	$197568495666, %rcx             # imm = 0x2E00000032
+	movq	%rcx, -52(%rbp)
+	movq	%rax, -44(%rbp)
+	movq	$118, -36(%rbp)
+	movq	$0, -28(%rbp)
+	movq	$0, -20(%rbp)
+	movl	$2, -4(%rbp)
+	cmpl	$6, -4(%rbp)
+	jg	.LBB1_3
+	.p2align	4, 0x90
+.LBB1_2:                                # %"$55"
+                                        # =>This Inner Loop Header: Depth=1
+	subq	$32, %rsp
+	callq	newscore
+	addq	$32, %rsp
+	movl	%eax, %esi
+	movl	-12(%rbp), %edx
+	subq	$32, %rsp
+	movl	%eax, %ecx
+	callq	score_copy
+	addq	$32, %rsp
+	movl	$16, %eax
+	callq	___chkstk_ms
+	subq	%rax, %rsp
+	movq	%rsp, %rax
+	movl	%esi, (%rax)
+	movl	-4(%rbp), %edi
+	subq	$32, %rsp
+	movl	%esi, %ecx
+	movl	%edi, %edx
+	callq	score_inc_pitch
+	addq	$32, %rsp
+	imull	$500, %edi, %eax                # imm = 0x1F4
+	movl	$12000, %edx                    # imm = 0x2EE0
+	subl	%eax, %edx
+	subq	$32, %rsp
+	movl	%esi, %ecx
+	callq	score_set_duration
+	addq	$32, %rsp
+	movl	-8(%rbp), %ecx
+	subq	$32, %rsp
+	movl	%esi, %edx
+	callq	score_append
+	addq	$32, %rsp
+	addl	$2, %edi
+	movl	%edi, -4(%rbp)
+	subq	$32, %rsp
+	movl	%edi, %ecx
+	callq	putint
+	addq	$32, %rsp
+	cmpl	$6, -4(%rbp)
+	jle	.LBB1_2
+.LBB1_3:                                # %"$56"
+	movl	-8(%rbp), %ecx
+	subq	$48, %rsp
 	movl	$2, 40(%rsp)
 	movl	$16, 32(%rsp)
-	leaq	-76(%rbp), %rdx
-	leaq	-36(%rbp), %r8
-	movl	%ebx, %ecx
+	leaq	-92(%rbp), %rdx
+	leaq	-52(%rbp), %r8
 	movl	$44100, %r9d                    # imm = 0xAC44
 	callq	score_sing
+	addq	$48, %rsp
 	xorl	%eax, %eax
-	addq	$144, %rsp
-	popq	%rbx
+	movq	%rbp, %rsp
 	popq	%rdi
 	popq	%rsi
-	popq	%r14
 	popq	%rbp
 	retq
 	.seh_endproc

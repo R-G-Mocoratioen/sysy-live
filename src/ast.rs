@@ -59,6 +59,12 @@ pub enum Stmt {
     PushNote(Box<Exp>, Box<Exp>),
     SetBarBpm(Box<Exp>, Box<Exp>),
     SetScoreBpm(Box<Exp>, Box<Exp>),
+    Append(Box<Exp>, Box<Exp>),
+    ReplaceBar(Box<Exp>, Box<Exp>, Box<Exp>),
+    IncScorePitch(Box<Exp>, Box<Exp>),
+    IncBarPitch(Box<Exp>, Box<Exp>),
+    SetScoreDuration(Box<Exp>, Box<Exp>),
+    SetBarDuration(Box<Exp>, Box<Exp>),
 }
 
 #[derive(Debug, Clone)]
@@ -100,6 +106,10 @@ pub enum VarDef {
     ScoreInit(String, Box<Score>),
     BarInit(String, Box<Bar>),
     NoteInit(String, Box<Note>, i32, i32),
+    BarCopy(String, Box<Exp>),
+    Bar(String),
+    Score(String),
+    ScoreCopy(String, Box<Exp>),
 }
 
 #[derive(Debug, Clone)]

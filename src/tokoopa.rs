@@ -141,6 +141,62 @@ impl CompUnit {
             Type::get_unit(),
             vec![Type::get_i32(), Type::get_i32()],
         );
+        self.adddecl(
+            program,
+            var,
+            "score_append".into(),
+            Type::get_unit(),
+            vec![Type::get_i32(), Type::get_i32()],
+        );
+        self.adddecl(
+            program,
+            var,
+            "bar_copy".into(),
+            Type::get_unit(),
+            vec![Type::get_i32(), Type::get_i32()],
+        );
+        self.adddecl(
+            program,
+            var,
+            "score_copy".into(),
+            Type::get_unit(),
+            vec![Type::get_i32(), Type::get_i32()],
+        );
+        self.adddecl(
+            program,
+            var,
+            "score_replace".into(),
+            Type::get_unit(),
+            vec![Type::get_i32(), Type::get_i32(), Type::get_i32()],
+        );
+        self.adddecl(
+            program,
+            var,
+            "score_inc_pitch".into(),
+            Type::get_unit(),
+            vec![Type::get_i32(), Type::get_i32()],
+        );
+        self.adddecl(
+            program,
+            var,
+            "bar_inc_pitch".into(),
+            Type::get_unit(),
+            vec![Type::get_i32(), Type::get_i32()],
+        );
+        self.adddecl(
+            program,
+            var,
+            "score_set_duration".into(),
+            Type::get_unit(),
+            vec![Type::get_i32(), Type::get_i32()],
+        );
+        self.adddecl(
+            program,
+            var,
+            "bar_set_duration".into(),
+            Type::get_unit(),
+            vec![Type::get_i32(), Type::get_i32()],
+        );
     }
 
     pub fn gen_ir(&self) -> Program {
@@ -544,6 +600,50 @@ impl VarDef {
                     .extend([alloc, store]);
                 var.insert(id.clone(), IdentValue::Value(alloc));
             }
+            VarDef::ScoreCopy(id, _y) => {
+                let myid = call_func("newscore", data, entry, var, vec![]);
+                let y = _y.gen_ir(data, entry, var);
+                let _ = call_func("score_copy", data, entry, var, vec![myid, y]);
+                let alloc = data.dfg_mut().new_value().alloc(Type::get_i32());
+                let store = data.dfg_mut().new_value().store(myid, alloc);
+                data.layout_mut()
+                    .bb_mut(*entry)
+                    .insts_mut()
+                    .extend([alloc, store]);
+                var.insert(id.clone(), IdentValue::Value(alloc));
+            }
+            VarDef::BarCopy(id, _y) => {
+                let myid = call_func("newbar", data, entry, var, vec![]);
+                let y = _y.gen_ir(data, entry, var);
+                let _ = call_func("bar_copy", data, entry, var, vec![myid, y]);
+                let alloc = data.dfg_mut().new_value().alloc(Type::get_i32());
+                let store = data.dfg_mut().new_value().store(myid, alloc);
+                data.layout_mut()
+                    .bb_mut(*entry)
+                    .insts_mut()
+                    .extend([alloc, store]);
+                var.insert(id.clone(), IdentValue::Value(alloc));
+            }
+            VarDef::Bar(id) => {
+                let myid = call_func("newbar", data, entry, var, vec![]);
+                let alloc = data.dfg_mut().new_value().alloc(Type::get_i32());
+                let store = data.dfg_mut().new_value().store(myid, alloc);
+                data.layout_mut()
+                    .bb_mut(*entry)
+                    .insts_mut()
+                    .extend([alloc, store]);
+                var.insert(id.clone(), IdentValue::Value(alloc));
+            }
+            VarDef::Score(id) => {
+                let myid = call_func("newscore", data, entry, var, vec![]);
+                let alloc = data.dfg_mut().new_value().alloc(Type::get_i32());
+                let store = data.dfg_mut().new_value().store(myid, alloc);
+                data.layout_mut()
+                    .bb_mut(*entry)
+                    .insts_mut()
+                    .extend([alloc, store]);
+                var.insert(id.clone(), IdentValue::Value(alloc));
+            }
         }
     }
 }
@@ -784,6 +884,17 @@ impl Stmt {
                     panic!("bar_setbpm is not a function");
                 }
             }
+            Stmt::Append(_id, _num) => {
+                let id = _id.gen_ir(data, entry, var);
+                let num = _num.gen_ir(data, entry, var);
+                let func = var.get("score_append".into()).unwrap().clone();
+                if let IdentValue::Func(func) = func {
+                    let call = data.dfg_mut().new_value().call(func, vec![id, num]);
+                    data.layout_mut().bb_mut(*entry).insts_mut().extend([call]);
+                } else {
+                    panic!("score_append is not a function");
+                }
+            }
             Stmt::SetScoreBpm(_id, _num) => {
                 let id = _id.gen_ir(data, entry, var);
                 let num = _num.gen_ir(data, entry, var);
@@ -793,6 +904,62 @@ impl Stmt {
                     data.layout_mut().bb_mut(*entry).insts_mut().extend([call]);
                 } else {
                     panic!("score_setbpm is not a function");
+                }
+            }
+            Stmt::ReplaceBar(_id, _a, _b) => {
+                let id = _id.gen_ir(data, entry, var);
+                let a = _a.gen_ir(data, entry, var);
+                let b = _b.gen_ir(data, entry, var);
+                let func = var.get("score_replace".into()).unwrap().clone();
+                if let IdentValue::Func(func) = func {
+                    let call = data.dfg_mut().new_value().call(func, vec![id, a, b]);
+                    data.layout_mut().bb_mut(*entry).insts_mut().extend([call]);
+                } else {
+                    panic!("score_replace is not a function");
+                }
+            }
+            Stmt::IncScorePitch(_id, _num) => {
+                let id = _id.gen_ir(data, entry, var);
+                let num = _num.gen_ir(data, entry, var);
+                let func = var.get("score_inc_pitch".into()).unwrap().clone();
+                if let IdentValue::Func(func) = func {
+                    let call = data.dfg_mut().new_value().call(func, vec![id, num]);
+                    data.layout_mut().bb_mut(*entry).insts_mut().extend([call]);
+                } else {
+                    panic!("score_inc_pitch is not a function");
+                }
+            }
+            Stmt::IncBarPitch(_id, _num) => {
+                let id = _id.gen_ir(data, entry, var);
+                let num = _num.gen_ir(data, entry, var);
+                let func = var.get("bar_inc_pitch".into()).unwrap().clone();
+                if let IdentValue::Func(func) = func {
+                    let call = data.dfg_mut().new_value().call(func, vec![id, num]);
+                    data.layout_mut().bb_mut(*entry).insts_mut().extend([call]);
+                } else {
+                    panic!("bar_inc_pitch is not a function");
+                }
+            }
+            Stmt::SetScoreDuration(_id, _num) => {
+                let id = _id.gen_ir(data, entry, var);
+                let num = _num.gen_ir(data, entry, var);
+                let func = var.get("score_set_duration".into()).unwrap().clone();
+                if let IdentValue::Func(func) = func {
+                    let call = data.dfg_mut().new_value().call(func, vec![id, num]);
+                    data.layout_mut().bb_mut(*entry).insts_mut().extend([call]);
+                } else {
+                    panic!("score_set_duration is not a function");
+                }
+            }
+            Stmt::SetBarDuration(_id, _num) => {
+                let id = _id.gen_ir(data, entry, var);
+                let num = _num.gen_ir(data, entry, var);
+                let func = var.get("bar_set_duration".into()).unwrap().clone();
+                if let IdentValue::Func(func) = func {
+                    let call = data.dfg_mut().new_value().call(func, vec![id, num]);
+                    data.layout_mut().bb_mut(*entry).insts_mut().extend([call]);
+                } else {
+                    panic!("bar_set_duration is not a function");
                 }
             }
         }

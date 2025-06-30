@@ -28,11 +28,9 @@ int newnote(int half, int fz, int fm) {
 
 struct Bar {
 	vector<int> notes;
-	double tonality; // 默认是 C4
 	int bpm;
 	Bar() {
 		notes.clear();
-		tonality = 261.626;
 		bpm = 100;
 	}
 };
@@ -47,8 +45,6 @@ int newbar() {
 
 void bar_copy(int x, int y) { bars[x] = bars[y]; }
 
-void bar_settonality(int x, int half) { bars[x].tonality = 261.626 * pow(2, half / 12.0); }
-
 void bar_setbpm(int x, int bpm) { bars[x].bpm = bpm; }
 
 void bar_push(int x, int note) {
@@ -56,13 +52,43 @@ void bar_push(int x, int note) {
 	cout << "add note with length " << notes[note].duration_beat << endl;
 }
 
+void bar_inc_pitch(int x, int semitones) {
+	for (int i = 0; i < bars[x].notes.size(); i++) {
+		int note_id = bars[x].notes[i];
+		Note tmp = notes[note_id];
+		if (tmp.rest_or_tie == 0) {
+			notes.push_back({tmp.rest_or_tie, tmp.half + semitones, tmp.duration_beat});
+			bars[x].notes[i] = notes.size() - 1;
+		}
+	}
+}
+
+void bar_set_duration(int x, int len_ms) {
+	double sum = 0;
+	for (int i = 0; i < bars[x].notes.size(); i++) {
+		sum += notes[bars[x].notes[i]].duration_beat;
+	}
+	if (sum == 0) return;
+	// sum * 1000 / len_ms * 60 拍，60 秒
+	bar_setbpm(x, sum * 60000 / len_ms);
+}
+
+void bar_inc_pitch_2(Bar &x, int semitones) {
+	for (int i = 0; i < x.notes.size(); i++) {
+		int note_id = x.notes[i];
+		Note tmp = notes[note_id];
+		if (tmp.rest_or_tie == 0) {
+			notes.push_back({tmp.rest_or_tie, tmp.half + semitones, tmp.duration_beat});
+			x.notes[i] = notes.size() - 1;
+		}
+	}
+}
+
 struct Score {
 	vector<Bar> bars;
-	double tonality;
 	int bpm;
 	Score() {
 		bars.clear();
-		tonality = 261.626;
 		bpm = 100;
 	}
 };
@@ -85,12 +111,27 @@ void score_append(int x, int y) {
 
 void score_replace(int x, int k, int id) { scores[x].bars[k] = bars[id]; }
 
-void score_settonality(int x, int half) { scores[x].tonality = 261.626 * pow(2, half / 12.0); }
-
 void score_setbpm(int x, int bpm) {
 	for (int i = 0; i < scores[x].bars.size(); i++) {
 		scores[x].bars[i].bpm = bpm;
 	}
+}
+
+void score_inc_pitch(int x, int semitones) {
+	for (int i = 0; i < scores[x].bars.size(); i++) {
+		bar_inc_pitch_2(scores[x].bars[i], semitones);
+	}
+}
+
+void score_set_duration(int x, int len_ms) {
+	double sum = 0;
+	for (int i = 0; i < scores[x].bars.size(); i++) {
+		for (int j = 0; j < scores[x].bars[i].notes.size(); j++) {
+			sum += notes[scores[x].bars[i].notes[j]].duration_beat;
+		}
+	}
+	if (sum == 0) return;
+	score_setbpm(x, sum * 60000 / len_ms);
 }
 
 void score_sing(int x, int *_name, int *_toname, int srate, int bytes, int channels) {

@@ -75,7 +75,19 @@ MusicDecl: VarDef = {
     },
     "Bar" <id: Ident> "(" "syllablename" "=" "\"" <bar: Bar> "\"" ")" ";" => {
         return VarDef::BarInit(id, Box::new(bar));
-    }
+    },
+    "Bar" <id: Ident> "(" <y: Exp> ")" ";" => {
+        return VarDef::BarCopy(id, Box::new(y));
+    },
+    "Bar" <id: Ident> ";" => {
+        return VarDef::Bar(id);
+    },
+    "Score" <id: Ident> "(" <y: Exp> ")" ";" => {
+        return VarDef::ScoreCopy(id, Box::new(y));
+    },
+    "Score" <id: Ident> ";" => {
+        return VarDef::Score(id);
+    },
 }
 
 Decl: Decl = {
@@ -177,6 +189,24 @@ MusicStmt: Stmt = {
     },
     <x: Exp> "." "set_score_bpm" "(" <a: Exp> ")" ";" => {
         return Stmt::SetScoreBpm(Box::new(x), Box::new(a));
+    },
+    <x: Exp> "." "inc_score_pitch" "(" <a: Exp> ")" ";" => {
+        return Stmt::IncScorePitch(Box::new(x), Box::new(a));
+    },
+    <x: Exp> "." "set_score_duration" "(" <a: Exp> ")" ";" => {
+        return Stmt::SetScoreDuration(Box::new(x), Box::new(a));
+    },
+    <x: Exp> "." "inc_bar_pitch" "(" <a: Exp> ")" ";" => {
+        return Stmt::IncBarPitch(Box::new(x), Box::new(a));
+    },
+    <x: Exp> "." "set_bar_duration" "(" <a: Exp> ")" ";" => {
+        return Stmt::SetBarDuration(Box::new(x), Box::new(a));
+    },
+    <x: Exp> "." "append" "(" <a: Exp> ")" ";" => {
+        return Stmt::Append(Box::new(x), Box::new(a));
+    },
+    <x: Exp> "." "replace_bar" "(" <a: Exp> "," <b: Exp> ")" ";" => {
+        return Stmt::ReplaceBar(Box::new(x), Box::new(a), Box::new(b));
     },
 }
 
