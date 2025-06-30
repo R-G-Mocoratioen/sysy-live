@@ -1,5 +1,6 @@
 // use crate::optimize_exp::OptimizeExp;
 use koopa::back::KoopaGenerator;
+use koopa::back::LlvmGenerator;
 use koopa::ir::*;
 use lalrpop_util::lalrpop_mod;
 use optimize_loadstore::OptimizeLoadStore;
@@ -19,7 +20,7 @@ mod optimize_loadstore;
 mod riscv;
 mod tokoopa;
 mod whilecontext;
-mod x86_32;
+mod gen_music;
 
 fn main() -> Result<()> {
     Type::set_ptr_size(4);
@@ -48,18 +49,17 @@ fn main() -> Result<()> {
         let text_from_ir = std::str::from_utf8(&gen.writer()).unwrap().to_string();
         std::fs::write(args[4].clone(), text_from_ir)?;
     }
+    if args[1] == "-llvm" {
+        let mut gen = LlvmGenerator::new(Vec::new());
+        gen.generate_on(&program).unwrap();
+        let text_from_ir = std::str::from_utf8(&gen.writer()).unwrap().to_string();
+        std::fs::write(args[4].clone(), text_from_ir)?;
+    }
     if args[1] == "-riscv" || args[1] == "-perf" {
         use crate::riscv::*;
         let mut m1: HashMap<Value, Position> = HashMap::new();
         let mut m2: HashMap<Function, (String, bool)> = HashMap::new();
         let str = program.to_riscv(&mut m1, &mut m2);
-        std::fs::write(args[4].clone(), str)?;
-    }
-    if args[1] == "-x86_32" {
-        use crate::x86_32::*;
-        let mut m1: HashMap<Value, Position> = HashMap::new();
-        let mut m2: HashMap<Function, (String, bool)> = HashMap::new();
-        let str = program.to_x86_32(&mut m1, &mut m2);
         std::fs::write(args[4].clone(), str)?;
     }
     Ok(())

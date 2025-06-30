@@ -1,66 +1,20 @@
-int n;
-int QuickSort(int arr[], int low, int high)
-{
-    if (low < high)
-    {
-        int i;
-        i = low;
-        int j;
-        j = high;
-        int k;
-        k = arr[low];
-        while (i < j)
-        {
-            while(i < j && arr[j] > k - 1)
-            {
-                j = j - 1;
-            }
- 
-            if(i < j)
-            {
-                arr[i] = arr[j];
-                i = i + 1;
-            }
- 
-            while(i < j && arr[i] < k)
-            {
-                i = i + 1;
-            }
- 
-            if(i < j)
-            {
-                arr[j] = arr[i];
-                j = j - 1;
-            }
-        }
- 
-        arr[i] = k;
-        int tmp;
-        tmp = i - 1;
-        tmp = QuickSort(arr, low, tmp);
-        tmp = i + 1;
-        tmp = QuickSort(arr, tmp, high);
-    }
-    return 0;
-}
-
-int main(){
-    n = 10;
-    int a[10];
-    a[0]=4;a[1]=3;a[2]=9;a[3]=2;a[4]=0;
-    a[5]=1;a[6]=6;a[7]=5;a[8]=7;a[9]=8;
-    int i;
-    i = 0;
-    int tmp;
-    tmp = 9;
-    i = QuickSort(a, i, tmp);
-    while (i < n) {
-        int tmp;
-        tmp = a[i];
-        putint(tmp);
-        tmp = 10;
-        putch(tmp);
-        i = i + 1;
-    }
+int main() {
+    Note tmp(syllablename = "::1", duration = "2/1");
+    Bar last;
+	Score x(syllablename = ":1 :1 :1 {:1 :2} | :3 :1 :1 {:1 7} | {6 :1} {7 6} {b6 6} {3 5}");
+	int a[10] = {49, 46, 119, 97, 118}; // 1.wav
+	int b[10] = {50, 46, 119, 97, 118}; // 2.wav
+    last.push_note(tmp);
+    last.push_note(tmp);
+    Bar rep(last);
+    Bar torep(syllablename = ":b5 :#5 {:7 :7} :6");
+    Score empty;
+    x.push_bar(last);
+    empty.push_bar(rep);
+    Score new_empty(empty);
+    x.append(new_empty);
+    x.set_score_bpm(150);
+    x.replace_bar(2, torep);
+	x.sing(a, b, 44100, 16, 2);
     return 0;
 }

@@ -54,6 +54,11 @@ pub enum Stmt {
     While(Box<Exp>, Box<Stmt>),
     Break,
     Continue,
+    Sing(Box<Exp>, Box<Exp>, Box<Exp>, Box<Exp>, Box<Exp>, Box<Exp>),
+    PushBar(Box<Exp>, Box<Exp>),
+    PushNote(Box<Exp>, Box<Exp>),
+    SetBarBpm(Box<Exp>, Box<Exp>),
+    SetScoreBpm(Box<Exp>, Box<Exp>),
 }
 
 #[derive(Debug, Clone)]
@@ -92,6 +97,9 @@ pub enum VarDef {
     ArrayInit(String, Vec<Box<Exp>>, Box<ArrayInit>),
     IdentInit(String, Box<Exp>),
     ConstIdentInit(String, Box<Exp>),
+    ScoreInit(String, Box<Score>),
+    BarInit(String, Box<Bar>),
+    NoteInit(String, Box<Note>, i32, i32),
 }
 
 #[derive(Debug, Clone)]
@@ -144,4 +152,36 @@ pub enum LAndExp {
 pub enum LOrExp {
     LAndExp(Box<LAndExp>),
     Or(Box<LOrExp>, Box<LAndExp>),
+}
+
+#[derive(Debug, Clone)]
+pub enum Note {
+    Semitone(i32),
+    Rest,
+}
+
+impl Note {
+    pub fn up(self, num: i32) -> Note {
+        match self {
+            Note::Semitone(n) => Note::Semitone(n + num * 12),
+            Note::Rest => Note::Rest,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum NoteElem {
+    Tie,
+    Note(Note),
+    Notes(Vec<Box<NoteElem>>),
+}
+
+#[derive(Debug, Clone)]
+pub struct Bar {
+    pub notes: Vec<NoteElem>,
+}
+
+#[derive(Debug, Clone)]
+pub struct Score {
+    pub bars: Vec<Bar>,
 }

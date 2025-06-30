@@ -1,4 +1,5 @@
 use crate::ast::*;
+use crate::gen_music::*;
 
 // lalrpop 里的约定
 grammar;
@@ -65,6 +66,18 @@ FuncDefParam: FuncParam = {
     },
 }
 
+MusicDecl: VarDef = {
+    "Score" <id: Ident> "(" "syllablename" "=" "\"" <score: Score> "\"" ")" ";" => {
+        return VarDef::ScoreInit(id, Box::new(score));
+    },
+    "Note" <id: Ident> "(" "syllablename" "=" "\"" <note: Note> "\"" "," "duration" "=" "\"" <fz: IntConst> "/" <fm: IntConst> "\"" ")" ";" => {
+        return VarDef::NoteInit(id, Box::new(note), fz, fm);
+    },
+    "Bar" <id: Ident> "(" "syllablename" "=" "\"" <bar: Bar> "\"" ")" ";" => {
+        return VarDef::BarInit(id, Box::new(bar));
+    }
+}
+
 Decl: Decl = {
     "int" <firdef: VarDef> <restdef: ("," VarDef)*> ";" => {
         let mut decl = Vec::new();
@@ -81,7 +94,9 @@ Decl: Decl = {
             decl.push(Box::new(item));
         }
         return Decl {defs: decl};
-    }
+    },
+    <musicdecl: MusicDecl> => Decl {defs: vec![Box::new(musicdecl)]},
+    
 }
 
 ArrayInit: ArrayInit = {
@@ -147,6 +162,24 @@ BlockItem: BlockItem = {
 
 OptionExp: Option<Exp> = Exp?;
 
+MusicStmt: Stmt = {
+    <x: Exp> "." "sing" "(" <a: Exp> "," <b: Exp> "," <c: Exp> "," <d: Exp> "," <e: Exp> ")" ";" => {
+        return Stmt::Sing(Box::new(x), Box::new(a), Box::new(b), Box::new(c), Box::new(d), Box::new(e));
+    },
+    <x: Exp> "." "push_bar" "(" <a: Exp> ")" ";" => {
+        return Stmt::PushBar(Box::new(x), Box::new(a));
+    },
+    <x: Exp> "." "push_note" "(" <a: Exp> ")" ";" => {
+        return Stmt::PushNote(Box::new(x), Box::new(a));
+    },
+    <x: Exp> "." "set_bar_bpm" "(" <a: Exp> ")" ";" => {
+        return Stmt::SetBarBpm(Box::new(x), Box::new(a));
+    },
+    <x: Exp> "." "set_score_bpm" "(" <a: Exp> ")" ";" => {
+        return Stmt::SetScoreBpm(Box::new(x), Box::new(a));
+    },
+}
+
 Stmt: Stmt = {
     <stmt: MatchedStmt> => <>,
     <stmt: UnMatchedStmt> => <>,
@@ -161,6 +194,7 @@ MatchedStmt: Stmt = {
     "while" "(" <exp: Exp> ")" <stmt: MatchedStmt> => Stmt::While(Box::new(exp), Box::new(stmt)),
     "break" ";" => Stmt::Break,
     "continue" ";" => Stmt::Continue,
+    <musicstmt: MusicStmt> => musicstmt,
 }
 
 UnMatchedStmt: Stmt = {
@@ -250,11 +284,96 @@ Number: i32 = <num: IntConst> => <>;
 // 如果匹配到标识符, 就返回这个字符串
 // 一对尖括号在此处指代的是正则表达式匹配到的字符串 (&str)
 // 关于尖括号到底代表什么, 请 RTFM
-Ident: String = r"[_a-zA-Z][_a-zA-Z0-9]*" => <>.to_string();
+Ident: String = {
+    r"[ac-zA-Z][_a-zA-Z0-9]*" => <>.to_string(),
+    r"b" => <>.to_string(),
+    r"b[_a-zA-Z08-9][_a-zA-Z0-9]*" => <>.to_string(),
+    r"b[1-7][_a-zA-Z0-9]+" => <>.to_string(),
+    <u: Underline> => u,
+    <u: SingleB1To7> => format!("b{}", u).to_string(),
+    <rest: r"_[_a-zA-Z0-9]+"> => rest.to_string(),
+}
+
+Underline: String = r"_" => "_".to_string();
 
 // 对整数字面量的处理方式: 把匹配到的字符串按对应进制转换成数字
 IntConst: i32 = {
-  r"[1-9][0-9]*" => i32::from_str_radix(<>, 10).unwrap(),
-  r"0[0-7]*" => i32::from_str_radix(<>, 8).unwrap(),
+  r"[8-9]" => i32::from_str_radix(<>, 10).unwrap(),
+  r"[1-9][0-9]+" => i32::from_str_radix(<>, 10).unwrap(),
+  r"0[0-7]+" => i32::from_str_radix(<>, 8).unwrap(),
   r"0[xX][0-9a-fA-F]+" => i32::from_str_radix(&<>[2..], 16).unwrap(),
+  <zero: Zero> => 0,
+  <v: Single1To7> => v,
 }
+
+Zero: i32 = r"0" => 0;
+
+Score: Score = {
+    <bar: Bar> <restbar: ("|" Bar)*> => {
+        let mut bars = Vec::new();
+        bars.push(bar);
+        for (_, item) in restbar.into_iter() {
+            bars.push(item);
+        }
+        return Score { bars: bars };
+    },
+}
+
+Bar: Bar = <notes: NoteElem+> => {
+    let mut note_elems = Vec::new();
+    for item in notes.into_iter() {
+        note_elems.push(item);
+    }
+    return Bar { notes: note_elems };
+};
+
+NoteElem: NoteElem = {
+    <note: Note> => NoteElem::Note(note),
+    <underline: Underline> => NoteElem::Tie,
+    "-" => NoteElem::Tie,
+    "{" <notes: NoteElem+> "}" => {
+        let mut note_elems = Vec::new();
+        for item in notes.into_iter() {
+            note_elems.push(Box::new(item));
+        }
+        return NoteElem::Notes(note_elems);
+    }
+}
+
+Note: Note = {
+    <dots:r":+"> <a: MidNote> => {
+        let dot_count = dots.len() as i32;
+        return a.up(dot_count);
+    },
+    <a: AfterDot> => a,
+    <zero: Zero> => Note::Rest,
+}
+
+AfterDot: Note = {
+    <a: MidNote> => {
+        return a;
+    },
+    <a: MidNote> <dots:r"\.+"> => {
+        let dot_count = dots.len() as i32;
+        return a.up(-dot_count);
+    },
+}
+
+MidNote: Note = {
+    <val: Single1To7> => Note::Semitone(count_semitone(val)),
+    <s: SingleB1To7> => Note::Semitone(count_semitone(s) - 1),
+    r"#[1-7]" => {
+        let num_str = &<>[1..];
+        let s = num_str.parse::<i32>().expect("Failed to parse number");
+        let new_s = count_semitone(s) + 1;
+        return Note::Semitone(new_s);
+    }
+}
+
+Single1To7: i32 = r"[1-7]" => i32::from_str_radix(<>, 10).unwrap();
+
+SingleB1To7: i32 = r"b[1-7]" => {
+    let num_str = &<>[1..];
+    let s = num_str.parse::<i32>().expect("Failed to parse number");
+    return s;
+};

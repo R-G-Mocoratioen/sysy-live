@@ -1,8 +1,7 @@
-// TODO: parse functions with array 参数; 全局的数组改定义返回 getelemptr 0
-
 use crate::arrayinit::*;
 use crate::ast::*;
 use crate::constint::*;
+use crate::gen_music::*;
 use crate::ident::*;
 use crate::whilecontext::*;
 use koopa::ir::builder::LocalInstBuilder;
@@ -82,6 +81,66 @@ impl CompUnit {
             Type::get_unit(),
             Vec::new(),
         );
+
+        // now comes the music decls
+        self.adddecl(
+            program,
+            var,
+            "score_sing".into(),
+            Type::get_unit(),
+            vec![
+                Type::get_i32(),
+                Type::get_pointer(Type::get_i32()),
+                Type::get_pointer(Type::get_i32()),
+                Type::get_i32(),
+                Type::get_i32(),
+                Type::get_i32(),
+            ],
+        );
+        self.adddecl(
+            program,
+            var,
+            "score_push".into(),
+            Type::get_unit(),
+            vec![Type::get_i32(), Type::get_i32()],
+        );
+        self.adddecl(
+            program,
+            var,
+            "bar_push".into(),
+            Type::get_unit(),
+            vec![Type::get_i32(), Type::get_i32()],
+        );
+        self.adddecl(
+            program,
+            var,
+            "newnote".into(),
+            Type::get_i32(),
+            vec![Type::get_i32(), Type::get_i32(), Type::get_i32()],
+        );
+        self.adddecl(
+            program,
+            var,
+            "newnote_rest".into(),
+            Type::get_i32(),
+            vec![Type::get_i32(), Type::get_i32(), Type::get_i32()],
+        );
+        self.adddecl(program, var, "newbar".into(), Type::get_i32(), vec![]);
+        self.adddecl(program, var, "newscore".into(), Type::get_i32(), vec![]);
+        self.adddecl(
+            program,
+            var,
+            "bar_setbpm".into(),
+            Type::get_unit(),
+            vec![Type::get_i32(), Type::get_i32()],
+        );
+        self.adddecl(
+            program,
+            var,
+            "score_setbpm".into(),
+            Type::get_unit(),
+            vec![Type::get_i32(), Type::get_i32()],
+        );
     }
 
     pub fn gen_ir(&self) -> Program {
@@ -158,6 +217,7 @@ impl CompUnit {
                             );
                             initmap.insert(id.clone(), res);
                         }
+                        _ => panic!("no global music declarations is allowed"),
                     }
                 }
             }
@@ -226,6 +286,7 @@ impl CompUnit {
                             let alloc = program.new_value().global_alloc(initv);
                             var.insert(id.clone(), IdentValue::Array(alloc, len.len() as i32));
                         }
+                        _ => unreachable!(),
                     }
                 }
             }
@@ -453,6 +514,36 @@ impl VarDef {
                 var.insert(id.clone(), IdentValue::Array(alloc, exps.len() as i32));
                 arrayinit.gen_ir(data, entry, var, alloc, lens.clone());
             }
+            VarDef::ScoreInit(id, score) => {
+                let it = gen_score(data, entry, var, score);
+                let alloc = data.dfg_mut().new_value().alloc(Type::get_i32());
+                let store = data.dfg_mut().new_value().store(it, alloc);
+                data.layout_mut()
+                    .bb_mut(*entry)
+                    .insts_mut()
+                    .extend([alloc, store]);
+                var.insert(id.clone(), IdentValue::Value(alloc));
+            }
+            VarDef::BarInit(id, bar) => {
+                let it = gen_bar(data, entry, var, bar);
+                let alloc = data.dfg_mut().new_value().alloc(Type::get_i32());
+                let store = data.dfg_mut().new_value().store(it, alloc);
+                data.layout_mut()
+                    .bb_mut(*entry)
+                    .insts_mut()
+                    .extend([alloc, store]);
+                var.insert(id.clone(), IdentValue::Value(alloc));
+            }
+            VarDef::NoteInit(id, note, fz, fm) => {
+                let it = gen_note(data, entry, var, (**note).clone(), fz.clone(), fm.clone());
+                let alloc = data.dfg_mut().new_value().alloc(Type::get_i32());
+                let store = data.dfg_mut().new_value().store(it, alloc);
+                data.layout_mut()
+                    .bb_mut(*entry)
+                    .insts_mut()
+                    .extend([alloc, store]);
+                var.insert(id.clone(), IdentValue::Value(alloc));
+            }
         }
     }
 }
@@ -641,6 +732,68 @@ impl Stmt {
                 data.layout_mut().bb_mut(bb2).insts_mut().extend([jto3]);
                 // if 结束
                 *entry = bb3;
+            }
+            Stmt::Sing(_id, _name1, _name2, _name3, _name4, _name5) => {
+                let id = _id.gen_ir(data, entry, var);
+                let name1 = _name1.gen_ir(data, entry, var);
+                let name2 = _name2.gen_ir(data, entry, var);
+                let name3 = _name3.gen_ir(data, entry, var);
+                let name4 = _name4.gen_ir(data, entry, var);
+                let name5 = _name5.gen_ir(data, entry, var);
+                let func = var.get("score_sing".into()).unwrap().clone();
+                if let IdentValue::Func(func) = func {
+                    let call = data
+                        .dfg_mut()
+                        .new_value()
+                        .call(func, vec![id, name1, name2, name3, name4, name5]);
+                    data.layout_mut().bb_mut(*entry).insts_mut().extend([call]);
+                } else {
+                    panic!("score_sing is not a function");
+                }
+            }
+            Stmt::PushBar(_id, _num) => {
+                let id = _id.gen_ir(data, entry, var);
+                let num = _num.gen_ir(data, entry, var);
+                let func = var.get("score_push".into()).unwrap().clone();
+                if let IdentValue::Func(func) = func {
+                    let call = data.dfg_mut().new_value().call(func, vec![id, num]);
+                    data.layout_mut().bb_mut(*entry).insts_mut().extend([call]);
+                } else {
+                    panic!("bar_push is not a function");
+                }
+            }
+            Stmt::PushNote(_id, _num) => {
+                let id = _id.gen_ir(data, entry, var);
+                let num = _num.gen_ir(data, entry, var);
+                let func = var.get("bar_push".into()).unwrap().clone();
+                if let IdentValue::Func(func) = func {
+                    let call = data.dfg_mut().new_value().call(func, vec![id, num]);
+                    data.layout_mut().bb_mut(*entry).insts_mut().extend([call]);
+                } else {
+                    panic!("bar_push is not a function");
+                }
+            }
+            Stmt::SetBarBpm(_id, _num) => {
+                let id = _id.gen_ir(data, entry, var);
+                let num = _num.gen_ir(data, entry, var);
+                let func = var.get("bar_setbpm".into()).unwrap().clone();
+                if let IdentValue::Func(func) = func {
+                    let call = data.dfg_mut().new_value().call(func, vec![id, num]);
+                    data.layout_mut().bb_mut(*entry).insts_mut().extend([call]);
+                } else {
+                    panic!("bar_setbpm is not a function");
+                }
+            }
+            Stmt::SetScoreBpm(_id, _num) => {
+                let id = _id.gen_ir(data, entry, var);
+                let num = _num.gen_ir(data, entry, var);
+                let func = var.get("score_setbpm".into()).unwrap().clone();
+                if let IdentValue::Func(func) = func {
+                    let call = data.dfg_mut().new_value().call(func, vec![id, num]);
+                    data.layout_mut().bb_mut(*entry).insts_mut().extend([call]);
+                } else {
+                    panic!("score_setbpm is not a function");
+                }
             }
         }
     }
