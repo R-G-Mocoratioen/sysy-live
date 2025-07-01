@@ -694,6 +694,41 @@ impl VarDef {
                     .extend([alloc, store]);
                 var.insert(id.clone(), IdentValue::Value(alloc));
             }
+            VarDef::Track(id) => {
+                let myid = call_func("newtrack", data, entry, var, vec![]);
+                let alloc = data.dfg_mut().new_value().alloc(Type::get_i32());
+                let store = data.dfg_mut().new_value().store(myid, alloc);
+                data.layout_mut()
+                    .bb_mut(*entry)
+                    .insts_mut()
+                    .extend([alloc, store]);
+                var.insert(id.clone(), IdentValue::Value(alloc));
+            }
+            VarDef::TrackLoad(id, _y) => {
+                let myid = call_func("newtrack", data, entry, var, vec![]);
+                let y = _y.gen_ir(data, entry, var);
+                let _ = call_func("track_load", data, entry, var, vec![myid, y]);
+                let alloc = data.dfg_mut().new_value().alloc(Type::get_i32());
+                let store = data.dfg_mut().new_value().store(myid, alloc);
+                data.layout_mut()
+                    .bb_mut(*entry)
+                    .insts_mut()
+                    .extend([alloc, store]);
+                var.insert(id.clone(), IdentValue::Value(alloc));
+            }
+            VarDef::TrackCopy(id, _y, _z) => {
+                let myid = call_func("newtrack", data, entry, var, vec![]);
+                let y = _y.gen_ir(data, entry, var);
+                let z = _z.gen_ir(data, entry, var);
+                let _ = call_func("track_copy", data, entry, var, vec![myid, y, z]);
+                let alloc = data.dfg_mut().new_value().alloc(Type::get_i32());
+                let store = data.dfg_mut().new_value().store(myid, alloc);
+                data.layout_mut()
+                    .bb_mut(*entry)
+                    .insts_mut()
+                    .extend([alloc, store]);
+                var.insert(id.clone(), IdentValue::Value(alloc));
+            }
         }
     }
 }
@@ -1010,6 +1045,54 @@ impl Stmt {
                     data.layout_mut().bb_mut(*entry).insts_mut().extend([call]);
                 } else {
                     panic!("bar_set_duration is not a function");
+                }
+            }
+            Stmt::AppendTrack(_id, _num) => {
+                let id = _id.gen_ir(data, entry, var);
+                let num = _num.gen_ir(data, entry, var);
+                let func = var.get("track_append".into()).unwrap().clone();
+                if let IdentValue::Func(func) = func {
+                    let call = data.dfg_mut().new_value().call(func, vec![id, num]);
+                    data.layout_mut().bb_mut(*entry).insts_mut().extend([call]);
+                } else {
+                    panic!("track_append is not a function");
+                }
+            }
+            Stmt::StackTrack(_id, _num) => {
+                let id = _id.gen_ir(data, entry, var);
+                let num = _num.gen_ir(data, entry, var);
+                let func = var.get("track_stack".into()).unwrap().clone();
+                if let IdentValue::Func(func) = func {
+                    let call = data.dfg_mut().new_value().call(func, vec![id, num]);
+                    data.layout_mut().bb_mut(*entry).insts_mut().extend([call]);
+                } else {
+                    panic!("track_stack is not a function");
+                }
+            }
+            Stmt::SetVol(_x, _y, _z) => {
+                let x = _x.gen_ir(data, entry, var);
+                let y = _y.gen_ir(data, entry, var);
+                let z = _z.gen_ir(data, entry, var);
+                let func = var.get("track_set_volume".into()).unwrap().clone();
+                if let IdentValue::Func(func) = func {
+                    let call = data.dfg_mut().new_value().call(func, vec![x, y, z]);
+                    data.layout_mut().bb_mut(*entry).insts_mut().extend([call]);
+                } else {
+                    panic!("track_set_volume is not a function");
+                }
+            }
+            Stmt::AppendSilence(_x, _y, _z, _p, _q) => {
+                let x = _x.gen_ir(data, entry, var);
+                let y = _y.gen_ir(data, entry, var);
+                let z = _z.gen_ir(data, entry, var);
+                let p = _p.gen_ir(data, entry, var);
+                let q = _q.gen_ir(data, entry, var);
+                let func = var.get("track_append_silence".into()).unwrap().clone();
+                if let IdentValue::Func(func) = func {
+                    let call = data.dfg_mut().new_value().call(func, vec![x, y, z, p, q]);
+                    data.layout_mut().bb_mut(*entry).insts_mut().extend([call]);
+                } else {
+                    panic!("track_append_silence is not a function");
                 }
             }
         }
