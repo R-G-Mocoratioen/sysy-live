@@ -212,7 +212,7 @@ void track_load(int x, int *_name) {
     tracks[x].name = name;
 } // load 就是直接放进去
 
-void track_copy(int x, int *_name1, int *_name2) {
+void track_copy(int x, int *_name1, int *_name2) { // name1 copy to (x, name2)
     string name1, name2;
     int ii = 0;
     while (_name1[ii]) name1.push_back((char)_name1[ii++]);

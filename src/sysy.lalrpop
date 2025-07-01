@@ -88,6 +88,15 @@ MusicDecl: VarDef = {
     "Score" <id: Ident> ";" => {
         return VarDef::Score(id);
     },
+    "Track" <id: Ident> "(" <y: Exp>, <z: Exp> ")" ";" => {
+        return VarDef::TrackCopy(id, Box::new(y), Box::new(z));
+    },
+    "Track" <id: Ident> "(" <y: Exp> ")" ";" => {
+        return VarDef::TrackLoad(id, Box::new(y));
+    },
+    "Track" <id: Ident> ";" => {
+        return VarDef::Track(id);
+    },
 }
 
 Decl: Decl = {
@@ -207,6 +216,18 @@ MusicStmt: Stmt = {
     },
     <x: Exp> "." "replace_bar" "(" <a: Exp> "," <b: Exp> ")" ";" => {
         return Stmt::ReplaceBar(Box::new(x), Box::new(a), Box::new(b));
+    },
+    <x: Exp> "." "append_track" "(" <a: Exp> ")" ";" => {
+        return Stmt::AppendTrack(Box::new(x), Box::new(a));
+    },
+    <x: Exp> "." "append_silence" "(" <a: Exp>, <b: Exp>, <c: Exp>, <d: Exp> ")" ";" => {
+        return Stmt::AppendSilence(Box::new(x), Box::new(a), Box::new(b), Box::new(c), Box::new(d));
+    },
+    <x: Exp> "." "stack" "(" <a: Exp> ")" ";" => {
+        return Stmt::StackTrack(Box::new(x), Box::new(a));
+    },
+    <x: Exp> "." "setvol" "(" <fz: Exp>, <fm: Exp> ")" ";" => {
+        return Stmt::SetVol(Box::new(x), Box::new(fz), Box::new(fm));
     },
 }
 
