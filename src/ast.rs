@@ -65,6 +65,10 @@ pub enum Stmt {
     IncBarPitch(Box<Exp>, Box<Exp>),
     SetScoreDuration(Box<Exp>, Box<Exp>),
     SetBarDuration(Box<Exp>, Box<Exp>),
+    AppendTrack(Box<Exp>, Box<Exp>),
+    StackTrack(Box<Exp>, Box<Exp>),
+    SetVol(Box<Exp>, Box<Exp>, Box<Exp>),
+    AppendSilence(Box<Exp>, Box<Exp>, Box<Exp>, Box<Exp>, Box<Exp>),
 }
 
 #[derive(Debug, Clone)]
@@ -110,6 +114,9 @@ pub enum VarDef {
     Bar(String),
     Score(String),
     ScoreCopy(String, Box<Exp>),
+    Track(String),
+    TrackLoad(String, Box<Exp>),
+    TrackCopy(String, Box<Exp>, Box<Exp>),
 }
 
 #[derive(Debug, Clone)]

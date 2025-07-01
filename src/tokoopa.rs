@@ -86,6 +86,27 @@ impl CompUnit {
         self.adddecl(
             program,
             var,
+            "track_copy".into(),
+            Type::get_unit(),
+            vec![
+                Type::get_i32(),
+                Type::get_pointer(Type::get_i32()),
+                Type::get_pointer(Type::get_i32()),
+            ],
+        );
+        self.adddecl(
+            program,
+            var,
+            "track_load".into(),
+            Type::get_unit(),
+            vec![
+                Type::get_i32(),
+                Type::get_pointer(Type::get_i32()),
+            ],
+        );
+        self.adddecl(
+            program,
+            var,
             "score_sing".into(),
             Type::get_unit(),
             vec![
@@ -127,6 +148,7 @@ impl CompUnit {
         );
         self.adddecl(program, var, "newbar".into(), Type::get_i32(), vec![]);
         self.adddecl(program, var, "newscore".into(), Type::get_i32(), vec![]);
+        self.adddecl(program, var, "newtrack".into(), Type::get_i32(), vec![]);
         self.adddecl(
             program,
             var,
@@ -196,6 +218,34 @@ impl CompUnit {
             "bar_set_duration".into(),
             Type::get_unit(),
             vec![Type::get_i32(), Type::get_i32()],
+        );
+        self.adddecl(
+            program,
+            var,
+            "track_append".into(),
+            Type::get_unit(),
+            vec![Type::get_i32(), Type::get_i32()],
+        );
+        self.adddecl(
+            program,
+            var,
+            "track_stack".into(),
+            Type::get_unit(),
+            vec![Type::get_i32(), Type::get_i32()],
+        );
+        self.adddecl(
+            program,
+            var,
+            "track_set_volume".into(),
+            Type::get_unit(),
+            vec![Type::get_i32(), Type::get_i32(), Type::get_i32()],
+        );
+        self.adddecl(
+            program,
+            var,
+            "track_append_silence".into(),
+            Type::get_unit(),
+            vec![Type::get_i32(), Type::get_i32(), Type::get_i32(), Type::get_i32(), Type::get_i32()],
         );
     }
 
