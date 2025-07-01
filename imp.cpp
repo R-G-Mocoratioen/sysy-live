@@ -193,6 +193,81 @@ void score_sing(int x, int *_name, int *_toname, int srate, int bytes, int chann
 	system(("rename " + finalname + " " + toname).c_str());
 }
 
+struct Track {
+    string name;
+};
+
+vector<Track> tracks;
+
+int newtrack() {
+    int id = tracks.size();
+    tracks.push_back({""});
+    return id;
+}
+
+void track_load(int x, int *_name) {
+    string name;
+    int ii = 0;
+    while (_name[ii]) name.push_back((char)_name[ii++]);
+    tracks[x].name = name;
+} // load 就是直接放进去
+
+void track_copy(int x, int *_name1, int *_name2) {
+    string name1, name2;
+    int ii = 0;
+    while (_name1[ii]) name1.push_back((char)_name1[ii++]);
+    ii = 0;
+    while (_name2[ii]) name2.push_back((char)_name2[ii++]);
+    system(("copy /y " + name1 + " " + name2).c_str());
+    tracks[x].name = name2;
+}
+
+void track_append(int x, int y) { // x += y
+    string name1 = tracks[x].name;
+    string name2 = tracks[y].name;
+	system(("del __tmp_" + name1 + ".wav").c_str());
+    system(("sox " + name1 + " " + name2 + " __tmp_" + name1+ ".wav").c_str());
+    system(("copy /y __tmp_" + name1 + ".wav " + name1).c_str());
+}
+
+void track_append_slience(int x, int len_ms, int srate, int bytes, int channels) {
+    string name = tracks[x].name;
+    system(("del __tmp_" + name + ".wav").c_str());
+    stringstream ss_len;
+    ss_len << fixed << setprecision(10) << len_ms / 1000.0;
+    system(("sox -n -r " + to_string(srate) + " -c " + to_string(channels) + " -b " +
+            to_string(bytes) + " __tmp_" + name + ".wav trim 0 " + ss_len.str())
+               .c_str());
+    system(("copy /y __tmp_" + name + ".wav " + name).c_str());
+}
+
+void track_set_volume(int x, int fz, int fm) {
+    string name = tracks[x].name;
+    stringstream ss_vol;
+    ss_vol << fixed << setprecision(10) << 1.0 * fz / fm;
+    system(("sox " + name + " " + name + " vol " + ss_vol).c_str());
+}
+
+void track_stack(int x, int y) { // x += y
+    string name1 = tracks[x].name;
+    string name2 = tracks[y].name;
+    system(("del __tmp_" + name1 + ".wav").c_str());
+    system(("sox -M " + name1 + " " + name2 + " __tmp_" + name1 + ".wav").c_str());
+    system(("copy /y __tmp_" + name1 + ".wav " + name1).c_str());
+}
+
+// struct Audio {
+//     string name;
+// };
+
+// vector<Audio> audios;
+
+// int newaudio() {
+//     int id = audios.size();
+//     audios.push_back({""});
+//     return id;
+// }
+
 void putint(int x) { printf("%d", x); }
 
 void putch(int x) { printf("%c", (char)x); }
