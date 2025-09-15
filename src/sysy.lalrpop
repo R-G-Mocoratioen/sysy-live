@@ -88,7 +88,7 @@ MusicDecl: VarDef = {
     "Score" <id: Ident> ";" => {
         return VarDef::Score(id);
     },
-    "Track" <id: Ident> "(" <y: Exp>, <z: Exp> ")" ";" => {
+    "Track" <id: Ident> "(" <y: Exp> "," <z: Exp> ")" ";" => {
         return VarDef::TrackCopy(id, Box::new(y), Box::new(z));
     },
     "Track" <id: Ident> "(" <y: Exp> ")" ";" => {
@@ -220,13 +220,13 @@ MusicStmt: Stmt = {
     <x: Exp> "." "append_track" "(" <a: Exp> ")" ";" => {
         return Stmt::AppendTrack(Box::new(x), Box::new(a));
     },
-    <x: Exp> "." "append_silence" "(" <a: Exp>, <b: Exp>, <c: Exp>, <d: Exp> ")" ";" => {
+    <x: Exp> "." "append_silence" "(" <a: Exp> "," <b: Exp> "," <c: Exp> "," <d: Exp> ")" ";" => {
         return Stmt::AppendSilence(Box::new(x), Box::new(a), Box::new(b), Box::new(c), Box::new(d));
     },
     <x: Exp> "." "stack" "(" <a: Exp> ")" ";" => {
         return Stmt::StackTrack(Box::new(x), Box::new(a));
     },
-    <x: Exp> "." "setvol" "(" <fz: Exp>, <fm: Exp> ")" ";" => {
+    <x: Exp> "." "setvol" "(" <fz: Exp> "," <fm: Exp> ")" ";" => {
         return Stmt::SetVol(Box::new(x), Box::new(fz), Box::new(fm));
     },
 }
@@ -404,7 +404,7 @@ AfterDot: Note = {
     <a: MidNote> => {
         return a;
     },
-    <a: MidNote> <dots:r"\.+"> => {
+    <a: MidNote> <dots:r"\$+"> => {
         let dot_count = dots.len() as i32;
         return a.up(-dot_count);
     },

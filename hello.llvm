@@ -19,6 +19,10 @@ declare void @starttime()
 
 declare void @stoptime()
 
+declare void @track_copy(i32, i32*, i32*)
+
+declare void @track_load(i32, i32*)
+
 declare void @score_sing(i32, i32*, i32*, i32, i32, i32)
 
 declare void @score_push(i32, i32)
@@ -32,6 +36,8 @@ declare i32 @newnote_rest(i32, i32, i32)
 declare i32 @newbar()
 
 declare i32 @newscore()
+
+declare i32 @newtrack()
 
 declare void @bar_setbpm(i32, i32)
 
@@ -53,6 +59,14 @@ declare void @score_set_duration(i32, i32)
 
 declare void @bar_set_duration(i32, i32)
 
+declare void @track_append(i32, i32)
+
+declare void @track_stack(i32, i32)
+
+declare void @track_set_volume(i32, i32, i32)
+
+declare void @track_append_silence(i32, i32, i32, i32, i32)
+
 define i32 @main() {
 $1:
   %$2 = call i32 @newscore()
@@ -61,127 +75,272 @@ $1:
   call void @bar_push(i32 %$3, i32 %$4)
   %$5 = call i32 @newnote(i32 12, i32 1, i32 1)
   call void @bar_push(i32 %$3, i32 %$5)
-  %$6 = call i32 @newnote(i32 12, i32 1, i32 1)
+  %$6 = call i32 @newnote(i32 19, i32 1, i32 1)
   call void @bar_push(i32 %$3, i32 %$6)
-  %$7 = call i32 @newnote(i32 12, i32 1, i32 2)
+  %$7 = call i32 @newnote(i32 19, i32 1, i32 1)
   call void @bar_push(i32 %$3, i32 %$7)
-  %$8 = call i32 @newnote(i32 14, i32 1, i32 2)
-  call void @bar_push(i32 %$3, i32 %$8)
   call void @score_push(i32 %$2, i32 %$3)
-  %$9 = call i32 @newbar()
-  %$10 = call i32 @newnote(i32 16, i32 1, i32 1)
-  call void @bar_push(i32 %$9, i32 %$10)
-  %$11 = call i32 @newnote(i32 12, i32 1, i32 1)
-  call void @bar_push(i32 %$9, i32 %$11)
-  %$12 = call i32 @newnote(i32 12, i32 1, i32 1)
-  call void @bar_push(i32 %$9, i32 %$12)
-  %$13 = call i32 @newnote(i32 12, i32 1, i32 2)
-  call void @bar_push(i32 %$9, i32 %$13)
-  %$14 = call i32 @newnote(i32 11, i32 1, i32 2)
-  call void @bar_push(i32 %$9, i32 %$14)
-  call void @score_push(i32 %$2, i32 %$9)
-  %$15 = call i32 @newbar()
-  %$16 = call i32 @newnote(i32 9, i32 1, i32 2)
-  call void @bar_push(i32 %$15, i32 %$16)
-  %$17 = call i32 @newnote(i32 12, i32 1, i32 2)
-  call void @bar_push(i32 %$15, i32 %$17)
-  %$18 = call i32 @newnote(i32 11, i32 1, i32 2)
-  call void @bar_push(i32 %$15, i32 %$18)
-  %$19 = call i32 @newnote(i32 9, i32 1, i32 2)
-  call void @bar_push(i32 %$15, i32 %$19)
-  %$20 = call i32 @newnote(i32 8, i32 1, i32 2)
-  call void @bar_push(i32 %$15, i32 %$20)
-  %$21 = call i32 @newnote(i32 9, i32 1, i32 2)
-  call void @bar_push(i32 %$15, i32 %$21)
-  %$22 = call i32 @newnote(i32 4, i32 1, i32 2)
-  call void @bar_push(i32 %$15, i32 %$22)
-  %$23 = call i32 @newnote(i32 7, i32 1, i32 2)
-  call void @bar_push(i32 %$15, i32 %$23)
-  call void @score_push(i32 %$2, i32 %$15)
-  %$24 = alloca i32
-  store i32 %$2, i32* %$24
-  %$25 = call i32 @newscore()
-  call void @score_copy(i32 %$25, i32 %$2)
-  %$26 = alloca i32
-  store i32 %$25, i32* %$26
-  %$27 = alloca [10 x i32]
-  %$28 = getelementptr inbounds [10 x i32], [10 x i32]* %$27, i32 0, i32 0
-  store i32 49, i32* %$28
-  %$29 = getelementptr inbounds [10 x i32], [10 x i32]* %$27, i32 0, i32 1
-  store i32 46, i32* %$29
-  %$30 = getelementptr inbounds [10 x i32], [10 x i32]* %$27, i32 0, i32 2
-  store i32 119, i32* %$30
-  %$31 = getelementptr inbounds [10 x i32], [10 x i32]* %$27, i32 0, i32 3
-  store i32 97, i32* %$31
-  %$32 = getelementptr inbounds [10 x i32], [10 x i32]* %$27, i32 0, i32 4
-  store i32 118, i32* %$32
-  %$33 = getelementptr inbounds [10 x i32], [10 x i32]* %$27, i32 0, i32 5
-  store i32 0, i32* %$33
-  %$34 = getelementptr inbounds [10 x i32], [10 x i32]* %$27, i32 0, i32 6
-  store i32 0, i32* %$34
-  %$35 = getelementptr inbounds [10 x i32], [10 x i32]* %$27, i32 0, i32 7
-  store i32 0, i32* %$35
-  %$36 = getelementptr inbounds [10 x i32], [10 x i32]* %$27, i32 0, i32 8
-  store i32 0, i32* %$36
-  %$37 = getelementptr inbounds [10 x i32], [10 x i32]* %$27, i32 0, i32 9
-  store i32 0, i32* %$37
-  %$38 = alloca [10 x i32]
-  %$39 = getelementptr inbounds [10 x i32], [10 x i32]* %$38, i32 0, i32 0
-  store i32 50, i32* %$39
-  %$40 = getelementptr inbounds [10 x i32], [10 x i32]* %$38, i32 0, i32 1
-  store i32 46, i32* %$40
-  %$41 = getelementptr inbounds [10 x i32], [10 x i32]* %$38, i32 0, i32 2
-  store i32 119, i32* %$41
-  %$42 = getelementptr inbounds [10 x i32], [10 x i32]* %$38, i32 0, i32 3
-  store i32 97, i32* %$42
-  %$43 = getelementptr inbounds [10 x i32], [10 x i32]* %$38, i32 0, i32 4
-  store i32 118, i32* %$43
-  %$44 = getelementptr inbounds [10 x i32], [10 x i32]* %$38, i32 0, i32 5
-  store i32 0, i32* %$44
-  %$45 = getelementptr inbounds [10 x i32], [10 x i32]* %$38, i32 0, i32 6
-  store i32 0, i32* %$45
-  %$46 = getelementptr inbounds [10 x i32], [10 x i32]* %$38, i32 0, i32 7
-  store i32 0, i32* %$46
-  %$47 = getelementptr inbounds [10 x i32], [10 x i32]* %$38, i32 0, i32 8
-  store i32 0, i32* %$47
-  %$48 = getelementptr inbounds [10 x i32], [10 x i32]* %$38, i32 0, i32 9
-  store i32 0, i32* %$48
-  %$49 = alloca i32
-  store i32 2, i32* %$49
-  br label %$50
-
-$50:
-  %$51 = load i32, i32* %$49
-  %$52 = icmp slt i32 %$51, 7
-  %$53 = zext i1 %$52 to i32
-  %$54 = icmp ne i32 %$53, 0
-  br i1 %$54, label %$55, label %$56
-
-$55:
-  %$57 = call i32 @newscore()
-  %$58 = load i32, i32* %$26
-  call void @score_copy(i32 %$57, i32 %$58)
-  %$59 = alloca i32
-  store i32 %$57, i32* %$59
-  %$60 = load i32, i32* %$49
-  call void @score_inc_pitch(i32 %$57, i32 %$60)
-  %$61 = mul i32 %$60, 500
-  %$62 = sub i32 12000, %$61
-  call void @score_set_duration(i32 %$57, i32 %$62)
-  %$63 = load i32, i32* %$24
-  call void @score_append(i32 %$63, i32 %$57)
-  %$64 = add i32 %$60, 2
-  store i32 %$64, i32* %$49
-  call void @putint(i32 %$64)
-  br label %$50
-
-$56:
-  %$65 = load i32, i32* %$24
-  %$66 = getelementptr inbounds [10 x i32], [10 x i32]* %$27, i32 0, i32 0
-  %$67 = getelementptr inbounds [10 x i32], [10 x i32]* %$38, i32 0, i32 0
-  call void @score_sing(i32 %$65, i32* %$66, i32* %$67, i32 44100, i32 16, i32 2)
+  %$8 = call i32 @newbar()
+  %$9 = call i32 @newnote(i32 21, i32 1, i32 1)
+  call void @bar_push(i32 %$8, i32 %$9)
+  %$10 = call i32 @newnote(i32 21, i32 1, i32 1)
+  call void @bar_push(i32 %$8, i32 %$10)
+  %$11 = call i32 @newnote(i32 19, i32 1, i32 1)
+  call void @bar_push(i32 %$8, i32 %$11)
+  %$12 = call i32 @newnote_rest(i32 2, i32 1, i32 1)
+  call void @bar_push(i32 %$8, i32 %$12)
+  call void @score_push(i32 %$2, i32 %$8)
+  %$13 = call i32 @newbar()
+  %$14 = call i32 @newnote(i32 17, i32 1, i32 1)
+  call void @bar_push(i32 %$13, i32 %$14)
+  %$15 = call i32 @newnote(i32 17, i32 1, i32 1)
+  call void @bar_push(i32 %$13, i32 %$15)
+  %$16 = call i32 @newnote(i32 16, i32 1, i32 1)
+  call void @bar_push(i32 %$13, i32 %$16)
+  %$17 = call i32 @newnote(i32 16, i32 1, i32 1)
+  call void @bar_push(i32 %$13, i32 %$17)
+  call void @score_push(i32 %$2, i32 %$13)
+  %$18 = call i32 @newbar()
+  %$19 = call i32 @newnote(i32 14, i32 1, i32 1)
+  call void @bar_push(i32 %$18, i32 %$19)
+  %$20 = call i32 @newnote(i32 14, i32 1, i32 1)
+  call void @bar_push(i32 %$18, i32 %$20)
+  %$21 = call i32 @newnote(i32 12, i32 1, i32 1)
+  call void @bar_push(i32 %$18, i32 %$21)
+  %$22 = call i32 @newnote_rest(i32 2, i32 1, i32 1)
+  call void @bar_push(i32 %$18, i32 %$22)
+  call void @score_push(i32 %$2, i32 %$18)
+  %$23 = alloca i32
+  store i32 %$2, i32* %$23
+  %$24 = call i32 @newscore()
+  %$25 = call i32 @newbar()
+  %$26 = call i32 @newnote(i32 0, i32 1, i32 1)
+  call void @bar_push(i32 %$25, i32 %$26)
+  %$27 = call i32 @newnote_rest(i32 2, i32 1, i32 1)
+  call void @bar_push(i32 %$25, i32 %$27)
+  %$28 = call i32 @newnote_rest(i32 2, i32 1, i32 1)
+  call void @bar_push(i32 %$25, i32 %$28)
+  %$29 = call i32 @newnote_rest(i32 2, i32 1, i32 1)
+  call void @bar_push(i32 %$25, i32 %$29)
+  call void @score_push(i32 %$24, i32 %$25)
+  %$30 = call i32 @newbar()
+  %$31 = call i32 @newnote(i32 5, i32 1, i32 1)
+  call void @bar_push(i32 %$30, i32 %$31)
+  %$32 = call i32 @newnote_rest(i32 2, i32 1, i32 1)
+  call void @bar_push(i32 %$30, i32 %$32)
+  %$33 = call i32 @newnote_rest(i32 2, i32 1, i32 1)
+  call void @bar_push(i32 %$30, i32 %$33)
+  %$34 = call i32 @newnote_rest(i32 2, i32 1, i32 1)
+  call void @bar_push(i32 %$30, i32 %$34)
+  call void @score_push(i32 %$24, i32 %$30)
+  %$35 = call i32 @newbar()
+  %$36 = call i32 @newnote(i32 -5, i32 1, i32 1)
+  call void @bar_push(i32 %$35, i32 %$36)
+  %$37 = call i32 @newnote_rest(i32 2, i32 1, i32 1)
+  call void @bar_push(i32 %$35, i32 %$37)
+  %$38 = call i32 @newnote(i32 -1, i32 1, i32 1)
+  call void @bar_push(i32 %$35, i32 %$38)
+  %$39 = call i32 @newnote_rest(i32 2, i32 1, i32 1)
+  call void @bar_push(i32 %$35, i32 %$39)
+  call void @score_push(i32 %$24, i32 %$35)
+  %$40 = call i32 @newbar()
+  %$41 = call i32 @newnote(i32 2, i32 1, i32 1)
+  call void @bar_push(i32 %$40, i32 %$41)
+  %$42 = call i32 @newnote(i32 7, i32 1, i32 1)
+  call void @bar_push(i32 %$40, i32 %$42)
+  %$43 = call i32 @newnote(i32 0, i32 1, i32 1)
+  call void @bar_push(i32 %$40, i32 %$43)
+  %$44 = call i32 @newnote_rest(i32 2, i32 1, i32 1)
+  call void @bar_push(i32 %$40, i32 %$44)
+  call void @score_push(i32 %$24, i32 %$40)
+  %$45 = alloca i32
+  store i32 %$24, i32* %$45
+  %$46 = call i32 @newscore()
+  %$47 = call i32 @newbar()
+  %$48 = call i32 @newnote(i32 24, i32 1, i32 2)
+  call void @bar_push(i32 %$47, i32 %$48)
+  %$49 = call i32 @newnote(i32 19, i32 1, i32 2)
+  call void @bar_push(i32 %$47, i32 %$49)
+  %$50 = call i32 @newnote(i32 24, i32 1, i32 2)
+  call void @bar_push(i32 %$47, i32 %$50)
+  %$51 = call i32 @newnote(i32 28, i32 1, i32 2)
+  call void @bar_push(i32 %$47, i32 %$51)
+  %$52 = call i32 @newnote(i32 31, i32 1, i32 2)
+  call void @bar_push(i32 %$47, i32 %$52)
+  %$53 = call i32 @newnote(i32 24, i32 1, i32 2)
+  call void @bar_push(i32 %$47, i32 %$53)
+  %$54 = call i32 @newnote(i32 28, i32 1, i32 2)
+  call void @bar_push(i32 %$47, i32 %$54)
+  %$55 = call i32 @newnote(i32 31, i32 1, i32 2)
+  call void @bar_push(i32 %$47, i32 %$55)
+  call void @score_push(i32 %$46, i32 %$47)
+  %$56 = call i32 @newbar()
+  %$57 = call i32 @newnote(i32 33, i32 1, i32 2)
+  call void @bar_push(i32 %$56, i32 %$57)
+  %$58 = call i32 @newnote(i32 29, i32 1, i32 2)
+  call void @bar_push(i32 %$56, i32 %$58)
+  %$59 = call i32 @newnote(i32 36, i32 1, i32 2)
+  call void @bar_push(i32 %$56, i32 %$59)
+  %$60 = call i32 @newnote(i32 33, i32 1, i32 2)
+  call void @bar_push(i32 %$56, i32 %$60)
+  %$61 = call i32 @newnote(i32 31, i32 1, i32 2)
+  call void @bar_push(i32 %$56, i32 %$61)
+  %$62 = call i32 @newnote(i32 28, i32 1, i32 2)
+  call void @bar_push(i32 %$56, i32 %$62)
+  %$63 = call i32 @newnote(i32 24, i32 1, i32 2)
+  call void @bar_push(i32 %$56, i32 %$63)
+  %$64 = call i32 @newnote(i32 28, i32 1, i32 2)
+  call void @bar_push(i32 %$56, i32 %$64)
+  call void @score_push(i32 %$46, i32 %$56)
+  %$65 = call i32 @newbar()
+  %$66 = call i32 @newnote(i32 29, i32 1, i32 2)
+  call void @bar_push(i32 %$65, i32 %$66)
+  %$67 = call i32 @newnote(i32 19, i32 1, i32 2)
+  call void @bar_push(i32 %$65, i32 %$67)
+  %$68 = call i32 @newnote(i32 26, i32 1, i32 2)
+  call void @bar_push(i32 %$65, i32 %$68)
+  %$69 = call i32 @newnote(i32 29, i32 1, i32 2)
+  call void @bar_push(i32 %$65, i32 %$69)
+  %$70 = call i32 @newnote(i32 23, i32 1, i32 2)
+  call void @bar_push(i32 %$65, i32 %$70)
+  %$71 = call i32 @newnote(i32 19, i32 1, i32 2)
+  call void @bar_push(i32 %$65, i32 %$71)
+  %$72 = call i32 @newnote(i32 23, i32 1, i32 2)
+  call void @bar_push(i32 %$65, i32 %$72)
+  %$73 = call i32 @newnote(i32 28, i32 1, i32 2)
+  call void @bar_push(i32 %$65, i32 %$73)
+  call void @score_push(i32 %$46, i32 %$65)
+  %$74 = call i32 @newbar()
+  %$75 = call i32 @newnote(i32 26, i32 1, i32 2)
+  call void @bar_push(i32 %$74, i32 %$75)
+  %$76 = call i32 @newnote(i32 19, i32 1, i32 2)
+  call void @bar_push(i32 %$74, i32 %$76)
+  %$77 = call i32 @newnote(i32 23, i32 1, i32 2)
+  call void @bar_push(i32 %$74, i32 %$77)
+  %$78 = call i32 @newnote(i32 26, i32 1, i32 2)
+  call void @bar_push(i32 %$74, i32 %$78)
+  %$79 = call i32 @newnote(i32 24, i32 1, i32 1)
+  call void @bar_push(i32 %$74, i32 %$79)
+  %$80 = call i32 @newnote_rest(i32 2, i32 1, i32 1)
+  call void @bar_push(i32 %$74, i32 %$80)
+  call void @score_push(i32 %$46, i32 %$74)
+  %$81 = alloca i32
+  store i32 %$46, i32* %$81
+  %$82 = alloca [10 x i32]
+  %$83 = getelementptr inbounds [10 x i32], [10 x i32]* %$82, i32 0, i32 0
+  store i32 49, i32* %$83
+  %$84 = getelementptr inbounds [10 x i32], [10 x i32]* %$82, i32 0, i32 1
+  store i32 46, i32* %$84
+  %$85 = getelementptr inbounds [10 x i32], [10 x i32]* %$82, i32 0, i32 2
+  store i32 119, i32* %$85
+  %$86 = getelementptr inbounds [10 x i32], [10 x i32]* %$82, i32 0, i32 3
+  store i32 97, i32* %$86
+  %$87 = getelementptr inbounds [10 x i32], [10 x i32]* %$82, i32 0, i32 4
+  store i32 118, i32* %$87
+  %$88 = getelementptr inbounds [10 x i32], [10 x i32]* %$82, i32 0, i32 5
+  store i32 0, i32* %$88
+  %$89 = getelementptr inbounds [10 x i32], [10 x i32]* %$82, i32 0, i32 6
+  store i32 0, i32* %$89
+  %$90 = getelementptr inbounds [10 x i32], [10 x i32]* %$82, i32 0, i32 7
+  store i32 0, i32* %$90
+  %$91 = getelementptr inbounds [10 x i32], [10 x i32]* %$82, i32 0, i32 8
+  store i32 0, i32* %$91
+  %$92 = getelementptr inbounds [10 x i32], [10 x i32]* %$82, i32 0, i32 9
+  store i32 0, i32* %$92
+  %$93 = alloca [10 x i32]
+  %$94 = getelementptr inbounds [10 x i32], [10 x i32]* %$93, i32 0, i32 0
+  store i32 50, i32* %$94
+  %$95 = getelementptr inbounds [10 x i32], [10 x i32]* %$93, i32 0, i32 1
+  store i32 46, i32* %$95
+  %$96 = getelementptr inbounds [10 x i32], [10 x i32]* %$93, i32 0, i32 2
+  store i32 119, i32* %$96
+  %$97 = getelementptr inbounds [10 x i32], [10 x i32]* %$93, i32 0, i32 3
+  store i32 97, i32* %$97
+  %$98 = getelementptr inbounds [10 x i32], [10 x i32]* %$93, i32 0, i32 4
+  store i32 118, i32* %$98
+  %$99 = getelementptr inbounds [10 x i32], [10 x i32]* %$93, i32 0, i32 5
+  store i32 0, i32* %$99
+  %$100 = getelementptr inbounds [10 x i32], [10 x i32]* %$93, i32 0, i32 6
+  store i32 0, i32* %$100
+  %$101 = getelementptr inbounds [10 x i32], [10 x i32]* %$93, i32 0, i32 7
+  store i32 0, i32* %$101
+  %$102 = getelementptr inbounds [10 x i32], [10 x i32]* %$93, i32 0, i32 8
+  store i32 0, i32* %$102
+  %$103 = getelementptr inbounds [10 x i32], [10 x i32]* %$93, i32 0, i32 9
+  store i32 0, i32* %$103
+  %$104 = alloca [10 x i32]
+  %$105 = getelementptr inbounds [10 x i32], [10 x i32]* %$104, i32 0, i32 0
+  store i32 51, i32* %$105
+  %$106 = getelementptr inbounds [10 x i32], [10 x i32]* %$104, i32 0, i32 1
+  store i32 46, i32* %$106
+  %$107 = getelementptr inbounds [10 x i32], [10 x i32]* %$104, i32 0, i32 2
+  store i32 119, i32* %$107
+  %$108 = getelementptr inbounds [10 x i32], [10 x i32]* %$104, i32 0, i32 3
+  store i32 97, i32* %$108
+  %$109 = getelementptr inbounds [10 x i32], [10 x i32]* %$104, i32 0, i32 4
+  store i32 118, i32* %$109
+  %$110 = getelementptr inbounds [10 x i32], [10 x i32]* %$104, i32 0, i32 5
+  store i32 0, i32* %$110
+  %$111 = getelementptr inbounds [10 x i32], [10 x i32]* %$104, i32 0, i32 6
+  store i32 0, i32* %$111
+  %$112 = getelementptr inbounds [10 x i32], [10 x i32]* %$104, i32 0, i32 7
+  store i32 0, i32* %$112
+  %$113 = getelementptr inbounds [10 x i32], [10 x i32]* %$104, i32 0, i32 8
+  store i32 0, i32* %$113
+  %$114 = getelementptr inbounds [10 x i32], [10 x i32]* %$104, i32 0, i32 9
+  store i32 0, i32* %$114
+  %$115 = alloca [10 x i32]
+  %$116 = getelementptr inbounds [10 x i32], [10 x i32]* %$115, i32 0, i32 0
+  store i32 52, i32* %$116
+  %$117 = getelementptr inbounds [10 x i32], [10 x i32]* %$115, i32 0, i32 1
+  store i32 46, i32* %$117
+  %$118 = getelementptr inbounds [10 x i32], [10 x i32]* %$115, i32 0, i32 2
+  store i32 119, i32* %$118
+  %$119 = getelementptr inbounds [10 x i32], [10 x i32]* %$115, i32 0, i32 3
+  store i32 97, i32* %$119
+  %$120 = getelementptr inbounds [10 x i32], [10 x i32]* %$115, i32 0, i32 4
+  store i32 118, i32* %$120
+  %$121 = getelementptr inbounds [10 x i32], [10 x i32]* %$115, i32 0, i32 5
+  store i32 0, i32* %$121
+  %$122 = getelementptr inbounds [10 x i32], [10 x i32]* %$115, i32 0, i32 6
+  store i32 0, i32* %$122
+  %$123 = getelementptr inbounds [10 x i32], [10 x i32]* %$115, i32 0, i32 7
+  store i32 0, i32* %$123
+  %$124 = getelementptr inbounds [10 x i32], [10 x i32]* %$115, i32 0, i32 8
+  store i32 0, i32* %$124
+  %$125 = getelementptr inbounds [10 x i32], [10 x i32]* %$115, i32 0, i32 9
+  store i32 0, i32* %$125
+  call void @score_inc_pitch(i32 %$2, i32 -12)
+  call void @score_inc_pitch(i32 %$24, i32 -12)
+  call void @score_inc_pitch(i32 %$46, i32 -12)
+  %$126 = getelementptr inbounds [10 x i32], [10 x i32]* %$82, i32 0, i32 0
+  %$127 = getelementptr inbounds [10 x i32], [10 x i32]* %$93, i32 0, i32 0
+  call void @score_sing(i32 %$2, i32* %$126, i32* %$127, i32 44100, i32 16, i32 2)
+  %$128 = getelementptr inbounds [10 x i32], [10 x i32]* %$82, i32 0, i32 0
+  %$129 = getelementptr inbounds [10 x i32], [10 x i32]* %$104, i32 0, i32 0
+  call void @score_sing(i32 %$24, i32* %$128, i32* %$129, i32 44100, i32 16, i32 2)
+  %$130 = getelementptr inbounds [10 x i32], [10 x i32]* %$82, i32 0, i32 0
+  %$131 = getelementptr inbounds [10 x i32], [10 x i32]* %$115, i32 0, i32 0
+  call void @score_sing(i32 %$46, i32* %$130, i32* %$131, i32 44100, i32 16, i32 2)
+  %$132 = call i32 @newtrack()
+  %$133 = getelementptr inbounds [10 x i32], [10 x i32]* %$93, i32 0, i32 0
+  call void @track_load(i32 %$132, i32* %$133)
+  %$134 = alloca i32
+  store i32 %$132, i32* %$134
+  %$135 = call i32 @newtrack()
+  %$136 = getelementptr inbounds [10 x i32], [10 x i32]* %$104, i32 0, i32 0
+  call void @track_load(i32 %$135, i32* %$136)
+  %$137 = alloca i32
+  store i32 %$135, i32* %$137
+  %$138 = call i32 @newtrack()
+  %$139 = getelementptr inbounds [10 x i32], [10 x i32]* %$115, i32 0, i32 0
+  call void @track_load(i32 %$138, i32* %$139)
+  %$140 = alloca i32
+  store i32 %$138, i32* %$140
+  call void @track_stack(i32 %$132, i32 %$135)
+  call void @track_stack(i32 %$132, i32 %$138)
   ret i32 0
 
-$68:
+$141:
   ret i32 0
 }

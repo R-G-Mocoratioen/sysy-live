@@ -245,7 +245,7 @@ void track_set_volume(int x, int fz, int fm) {
     string name = tracks[x].name;
     stringstream ss_vol;
     ss_vol << fixed << setprecision(10) << 1.0 * fz / fm;
-    system(("sox " + name + " " + name + " vol " + ss_vol).c_str());
+    system(("sox " + name + " " + name + " vol " + ss_vol.str()).c_str());
 }
 
 void track_stack(int x, int y) { // x += y
